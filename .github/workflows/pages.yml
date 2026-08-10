@@ -38,9 +38,10 @@ jobs:
       - name: Assemble static site
         shell: bash
         run: |
+          test -s assets/aisaq-storage-yard.png
           mkdir _site
           cp index.html .nojekyll _site/
-          cp -R css js _site/
+          cp -R assets css js _site/
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v6
