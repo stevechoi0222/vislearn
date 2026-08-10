@@ -4,33 +4,37 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#142a37">
-  <meta name="description" content="A guided, interactive explanation of AiSAQ: how moving product-quantized vectors from DRAM into SSD node chunks changes memory, I/O, and index switching.">
-  <title>AiSAQ Storage Yard — Learn the paper visually</title>
-  <link rel="stylesheet" href="css/styles.css">
+  <meta name="description" content="A full-screen animated factory that compares DiskANN and AiSAQ through one query, from data placement and SSD reads to re-ranking, block cost, evidence, and limits.">
+  <title>Vector Search Works — DiskANN vs AiSAQ</title>
+  <link rel="stylesheet" href="css/styles.css?v=factory-20260810k">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142a37'/%3E%3Cpath d='M13 18h38v28H13z' fill='%234aaE9b'/%3E%3Cpath d='M18 23h9v8h-9zm0 12h9v6h-9zm13-12h15v8H31zm0 12h15v6H31z' fill='%23f5c84c'/%3E%3C/svg%3E">
 </head>
 <body>
   <!--
   THESIS: AiSAQ is a data-placement change, not a new graph; the same query crosses the same graph while PQ codes move from a scale-bound DRAM warehouse into SSD node chunks.
-  OWN-WORLD: A matte isometric storage yard on 4 KB address plots, with cobalt DRAM, mint SSD, signal-yellow PQ cargo, ink control rails, and paper evidence ledgers.
+  OWN-WORLD: A full-screen isometric vector-search factory with cobalt DiskANN machines, mint AiSAQ machines, signal-yellow data cargo, and seven camera stations.
   STORY: Follow one query hop, compare both layouts, test block packing, inspect paper evidence, and recall the tradeoff.
-  FIRST VIEWPORT: A split storage yard dominates; a synchronized guide sits right and playback controls span the bottom.
-  FORM: User-pinned low-poly learning simulation fused with a memory-allocation atlas; seed e1cadee4; split-yard staging with a guided route.
+  FIRST VIEWPORT: One animated factory fills the screen; a synchronized inspector sits right and an operating console spans the bottom.
+  FORM: A low-poly process tour where one authoritative state drives camera, machines, cargo, HUD, inspector, and controls.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
   <a class="skip-link" href="#learning-guide">Skip to the learning guide</a>
 
   <header class="topbar">
-    <a class="brand" href="#top" aria-label="AiSAQ Storage Yard home">
+    <a class="brand" href="#top" aria-label="Vector Search Works home">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span>AiSAQ</span>
+      <span class="brand-copy"><strong>Vector Search Works</strong><small>DiskANN and AiSAQ, station by station</small></span>
     </a>
-    <p class="thesis">Move the codes. <strong>Keep the graph.</strong></p>
+    <div class="factory-hud" aria-label="Simulation status">
+      <span>LINE <strong id="hud-line">Both</strong></span>
+      <span>STATION <strong id="hud-station">1 / 7</strong></span>
+      <span>ACTION <strong id="hud-action">1 / 4</strong></span>
+      <span>MODE <strong id="hud-query">index inspection</strong></span>
+    </div>
     <nav class="topnav" aria-label="Page sections">
-      <a href="#block-lab">Block lab</a>
-      <a href="#evidence">Evidence</a>
-      <a href="#quiz">Recall test</a>
-      <a href="#sources">Sources</a>
+      <a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper</a>
+      <a href="#sources">About &amp; accuracy</a>
+      <button class="plain-button" id="panel-toggle" type="button" aria-expanded="true" aria-controls="learning-guide">Hide guide</button>
     </nav>
     <button class="plain-button top-menu" id="top-menu" type="button" aria-expanded="false" aria-controls="mobile-nav">
       <span class="sr-only">Toggle navigation</span>
@@ -44,23 +48,6 @@
   <main id="top">
     <section class="sim-shell" aria-labelledby="sim-heading">
       <h1 id="sim-heading" class="sr-only">AiSAQ and DiskANN interactive storage-layout comparison</h1>
-
-      <div class="sim-toolbar" aria-label="Simulation settings">
-        <div class="mode-switch" role="group" aria-label="View mode">
-          <button type="button" data-view="split" class="active" aria-pressed="true">Compare</button>
-          <button type="button" data-view="diskann" aria-pressed="false">DiskANN</button>
-          <button type="button" data-view="aisaq" aria-pressed="false">AiSAQ</button>
-        </div>
-        <label class="dataset-field">
-          <span>Dataset preset</span>
-          <select id="dataset-select" aria-label="Dataset preset">
-            <option value="SIFT1B">SIFT1B · 1 billion</option>
-            <option value="SIFT1M">SIFT1M · 1 million</option>
-            <option value="KILT E5 22M">KILT E5 · 22.2 million</option>
-          </select>
-        </label>
-        <a class="paper-link" href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Open paper <span aria-hidden="true">↗</span></a>
-      </div>
 
       <div class="sim-grid">
         <div class="stage-wrap">
@@ -76,14 +63,17 @@
           </div>
           <p class="sr-only" id="phase-live" role="status" aria-live="polite" aria-atomic="true"></p>
 
-          <div class="yard-label yard-label-left" aria-hidden="true">
-            <span>DiskANN</span><small>Graph on SSD · all PQ codes in DRAM</small>
-          </div>
-          <div class="yard-label yard-label-right" aria-hidden="true">
-            <span>AiSAQ</span><small>Graph + neighbor PQ codes on SSD</small>
+          <div class="camera-controls" aria-label="Factory camera controls">
+            <button id="camera-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
+            <button id="camera-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
+            <button id="camera-fit" type="button" aria-label="Show the whole factory" title="Show the whole factory">⤢</button>
           </div>
 
-          <p class="illustrative-badge">Storage-layout schematic · decorative nodes are not the graph topology</p>
+          <div class="line-key" aria-hidden="true">
+            <span><i class="diskann-key"></i>DiskANN · global PQ in DRAM</span>
+            <span><i class="aisaq-key"></i>AiSAQ · neighbor PQ inline on SSD</span>
+            <span><i class="query-key"></i>same logical query</span>
+          </div>
 
           <div class="live-ledger" aria-live="polite" aria-atomic="true">
             <div class="ledger-item diskann-ledger">
@@ -105,14 +95,31 @@
         </div>
 
         <div class="transport" aria-label="Simulation controls">
+          <div class="query-plate">
+            <span>LEARNING RUN</span><strong>PAPER 2404.06004</strong>
+          </div>
           <div class="transport-actions">
+            <button class="run-button" id="tour-start" type="button">Run tour</button>
             <button class="control-button primary" id="play" type="button" aria-label="Pause simulation" title="Play or pause (Space)">
               <span id="play-icon" aria-hidden="true">Ⅱ</span><span class="control-label" id="play-label">Pause</span>
             </button>
-            <button class="control-button" id="next" type="button" title="Next stop (Right arrow)"><span aria-hidden="true">↦</span><span class="control-label">Next</span></button>
-            <button class="control-button" id="restart" type="button" title="Restart (R)"><span aria-hidden="true">↺</span><span class="control-label">Restart</span></button>
+            <button class="control-button" id="next" type="button" aria-label="Next action" title="Next stop (Right arrow)"><span aria-hidden="true">↦</span><span class="control-label">Next</span></button>
+            <button class="control-button" id="restart" type="button" aria-label="Restart tour" title="Restart (R)"><span aria-hidden="true">↺</span><span class="control-label">Restart</span></button>
           </div>
           <div class="tour-progress" aria-label="Tour progress"><i id="tour-progress"></i></div>
+          <div class="mode-switch" role="group" aria-label="View mode">
+            <button type="button" data-view="split" class="active" aria-pressed="true">Both</button>
+            <button type="button" data-view="diskann" aria-pressed="false">DiskANN</button>
+            <button type="button" data-view="aisaq" aria-pressed="false">AiSAQ</button>
+          </div>
+          <label class="dataset-field">
+            <span>Dataset</span>
+            <select id="dataset-select" aria-label="Dataset preset">
+              <option value="SIFT1B">SIFT1B · 1B</option>
+              <option value="SIFT1M">SIFT1M · 1M</option>
+              <option value="KILT E5 22M">KILT E5 · 22.2M</option>
+            </select>
+          </label>
           <label class="speed-field"><span>Speed <strong id="speed-value">1×</strong></span><input id="speed" type="range" min="0.5" max="3" step="0.5" value="1"></label>
           <div class="transport-toggles">
             <label><input id="follow" type="checkbox" checked><span>Follow query</span></label>
@@ -121,13 +128,14 @@
         </div>
 
         <aside class="learning-guide" id="learning-guide" aria-labelledby="stage-title">
+          <button class="guide-handle" id="guide-handle" type="button" aria-expanded="true" aria-controls="guide-body"><span>Details</span><i aria-hidden="true"></i></button>
           <div class="guide-head">
             <div class="stage-meta"><span id="stage-count">Stop 1 of 7</span><span id="stage-source-short">Paper §1</span></div>
             <h2 id="stage-title">The memory wall</h2>
             <p id="stage-short">A billion tiny routing hints become a very large DRAM commitment.</p>
           </div>
           <div class="dwell" id="dwell" aria-hidden="true"><i id="dwell-bar"></i></div>
-          <div class="guide-body">
+          <div class="guide-body" id="guide-body">
             <p id="stage-body"></p>
             <a id="stage-source" class="source-link" href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper §1 <span aria-hidden="true">↗</span></a>
 
@@ -183,7 +191,7 @@
         <p>During index creation, routing hints are preplaced at a different address. That changes the memory curve, the I/O shape, and how quickly an index can be switched.</p>
       </div>
       <div class="spine-flow" aria-label="AiSAQ concept flow">
-        <div><span>1</span><strong>Same graph</strong><p>Vamana topology and beam-search decisions stay intact.</p></div>
+        <div><span>1</span><strong>Same graph</strong><p>Vamana topology and the beam-search rule stay intact.</p></div>
         <b aria-hidden="true">→</b>
         <div><span>2</span><strong>Codes are preplaced</strong><p>Index creation duplicates outneighbor PQ codes into SSD node chunks.</p></div>
         <b aria-hidden="true">→</b>
@@ -305,6 +313,7 @@
             <li><a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Current v2 PDF <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/kioxia-jp/aisaq-diskann" target="_blank" rel="noreferrer">Authors’ implementation <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/" target="_blank" rel="noreferrer">Learning-method reference <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://github.com/LaurentiuGabriel/rocket-engine" target="_blank" rel="noreferrer">Factory-interaction reference <span aria-hidden="true">↗</span></a></li>
           </ul>
         </div>
         <div>
@@ -324,14 +333,14 @@
 
   <footer>
     <p>Built to make one systems-paper idea visible.</p>
-    <p><a href="#top">Back to the yard ↑</a></p>
+    <p><a href="#top">Back to the factory ↑</a></p>
   </footer>
 
-  <script src="js/content.js"></script>
-  <script src="js/iso.js"></script>
-  <script src="js/sim.js"></script>
-  <script src="js/render.js"></script>
-  <script src="js/ui.js"></script>
-  <script src="js/main.js"></script>
+  <script src="js/content.js?v=factory-20260810k"></script>
+  <script src="js/iso.js?v=factory-20260810k"></script>
+  <script src="js/sim.js?v=factory-20260810k"></script>
+  <script src="js/render.js?v=factory-20260810k"></script>
+  <script src="js/ui.js?v=factory-20260810k"></script>
+  <script src="js/main.js?v=factory-20260810k"></script>
 </body>
 </html>

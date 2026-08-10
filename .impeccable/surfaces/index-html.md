@@ -5,7 +5,7 @@ primary_target: "index.html"
 related_targets: ["css/styles.css","js/render.js","js/ui.js"]
 ---
 
-# Surface Brief: AiSAQ Storage Yard
+# Surface Brief: Vector Search Works
 
 - Scope: root `index.html`; visitor mode is Read through an interactive Experience.
 - Audience: technically curious readers learning arXiv:2404.06004 from first principles.
@@ -16,19 +16,21 @@ related_targets: ["css/styles.css","js/render.js","js/ui.js"]
 
 ## Chosen direction
 
-An isometric low-poly storage yard fused with a memory-allocation atlas. The approved north star is `.impeccable/mocks/aisaq-comp-a-split-yard.png`, supplemented by the route-first guide structure from `.impeccable/mocks/aisaq-comp-c-query-route.png`. The memorable moment is the same yellow query vehicle crossing the same graph while the cobalt DRAM warehouse empties and yellow PQ cargo appears inside mint SSD node chunks.
+A full-screen, independently drawn isometric vector-search factory. One continuous route connects seven stations, and every station contains adjacent DiskANN and AiSAQ machines performing the same action on the same logical query. The memorable moment is the paired signal-yellow query pods arriving together while the cobalt machine fetches PQ data from DRAM and the mint machine reveals equivalent PQ payload already packaged in the SSD node chunk.
 
 ## Implementation inventory
 
 | Visible ingredient | Commitment | Medium |
 |---|---|---|
-| Ink utility rail | compact brand, thesis, four source/learning links | semantic HTML/CSS |
-| Split storage yard | simultaneous DiskANN/AiSAQ comparison on 4 KB plots | animated Canvas geometry |
-| DRAM warehouses | scale-heavy cobalt warehouse versus small mint entry-state store | animated Canvas cuboids |
-| Query route | same yellow vehicle, same graph path, synchronized focus states | animated Canvas |
-| Paper guide | seven stops, source anchor, truth note, route jump list | semantic HTML |
-| Live ledger | peak memory, resident/working PQ codes, derived blocks | semantic HTML, tabular data |
-| Transport dock | play/pause, next, restart, speed, follow, labels | semantic form controls |
+| Overlay header and HUD | compact brand plus line, station, action, query, paper, accuracy, and guide controls | semantic HTML/CSS |
+| Single factory floor | one procedural isometric world with a continuous seven-station route | animated Canvas primitives |
+| Paired station machinery | adjacent cobalt DiskANN and mint AiSAQ machines at every stage | animated Canvas cuboids, rotors, drawers, scanners, and blocks |
+| Query route | synchronized yellow pods follow one route and retain method-colored outlines | animated Canvas |
+| Camera system | fitted overview, active-station follow, zoom, Fit, panel-aware centering, and Canvas station picking | Canvas interaction |
+| Scene status and live ledger | current action plus peak memory, PQ residency, and derived block span | semantic HTML, tabular data |
+| Right inspector | seven stops, bilateral action explanation, source anchor, checkpoint, and route jump list | semantic HTML |
+| Bottom control dock | run, play/pause, next, restart, progress, view, dataset, speed, follow, and labels | semantic form controls |
+| Mobile bottom sheet | persistent Details handle with compact bilateral explanation above the mobile dock | responsive HTML/CSS |
 | Block lab | three paper presets and transparent formula-derived packing | semantic form controls + CSS blocks |
 | Evidence | exact Tables 2-4 values and scoped measurement note | semantic table + CSS bars |
 | Tradeoff balance | lighter DRAM/load time versus heavier SSD/I-O/features | semantic HTML/CSS |
@@ -37,8 +39,8 @@ An isometric low-poly storage yard fused with a memory-allocation atlas. The app
 
 ## Responsive commitments
 
-Desktop keeps the yard and guide side by side. Tablet moves the guide below the yard. Mobile preserves simultaneous comparison, puts the dataset control on its own row, reduces nonessential canvas labels, and stacks evidence, tradeoffs, questions, and sources without horizontal scrolling.
+Desktop keeps the Canvas full-screen while the header/HUD, upper-left ledger, right inspector, left camera controls, and bottom dock overlay it. Hiding the inspector expands the dock and recenters the camera. Narrow desktop removes low-priority HUD and dock controls before disturbing the paired factory geometry. At 760px and below, the inspector becomes a collapsible bottom sheet above a compact dock; dataset, speed, method view, toggles, the method key, and nonessential labels are hidden. Both method machines remain together on the same floor, and editorial evidence, tradeoffs, questions, and sources stack below without horizontal scrolling.
 
-## Unresolved publishing decision
+## Motion and accessibility commitments
 
-The local directory implies a new public `stevechoi0222/vislearn` repository. Confirm that inference immediately before external creation/push if the user changes direction.
+While playback runs, ambient route dashes, beacons, background lights, and idle machinery keep the factory visibly alive. The current phase separately drives explanatory packet movement, scoring, re-ranking, block packing, evidence motion, HUD text, and the bilateral inspector. Pause freezes both ambient and semantic Canvas time. Reduced-motion mode starts paused, snaps camera changes, removes smooth checkpoint scrolling and CSS transitions, and keeps keyboard stepping, direct station jumps, zoom, Fit, Follow, and Labels available. The Canvas retains semantic fallback text and stage changes are announced through a polite live region.

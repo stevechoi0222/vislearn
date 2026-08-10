@@ -1,6 +1,6 @@
-# AiSAQ Storage Yard
+# Vector Search Works: DiskANN vs AiSAQ
 
-AiSAQ Storage Yard is a dependency-free, interactive explanation of **AiSAQ** from [arXiv:2404.06004v2](https://arxiv.org/abs/2404.06004). It turns the paper's central data-placement idea into a controllable storage-yard simulation: a query moves through the same graph while the interface shows what resides in DRAM, what is read from SSD, and how the DiskANN and AiSAQ layouts differ.
+Vector Search Works is a dependency-free, interactive explanation of **AiSAQ** from [arXiv:2404.06004v2](https://arxiv.org/abs/2404.06004). It turns the paper's central data-placement idea into a full-screen, seven-station factory: the same query moves through synchronized DiskANN and AiSAQ machines while the interface shows what resides in DRAM, what is read from SSD, and why the layouts differ.
 
 The learning approach is inspired by Laurentiu Raducu's article, ["How I use LLMs to learn complex topics"](https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/): build a source-grounded mental model, map abstract concepts to persistent visual objects, and let the learner stop, replay, and inspect the process.
 
@@ -32,7 +32,9 @@ The primary technical source is:
 
 - Kento Tatsuno, Daisuke Miyashita, Taiga Ikeda, Kiyoshi Ishiyama, Kazunari Sumiyoshi, and Jun Deguchi, ["AiSAQ: All-in-Storage ANNS with Product Quantization for DRAM-free Information Retrieval"](https://arxiv.org/pdf/2404.06004v2), arXiv:2404.06004v2.
 
-Claims tied to the paper are cited in the interface by section, figure, or table. The yard, forklifts, moving query, timing, block shapes, and small example graph are teaching metaphors—not a benchmark trace or a literal rendering of the implementation. Any values marked as illustrative are not paper results. Consult the paper for the algorithm, experimental setup, qualifications, and exact measurements.
+Claims tied to the paper are cited in the interface by section, figure, or table. The factory stations, machines, moving query, timing, block shapes, and small example graph are teaching metaphors—not a benchmark trace or a literal rendering of the implementation. Any values marked as illustrative are not paper results. Consult the paper for the algorithm, experimental setup, qualifications, and exact measurements.
+
+The full-screen factory interaction was studied from [LaurentiuGabriel/rocket-engine](https://github.com/LaurentiuGabriel/rocket-engine). That repository does not include a license file, so this project does not copy its code, artwork, logo, or prose; the Canvas factory and AiSAQ process model are independently implemented.
 
 ## Deploy with GitHub Pages
 
@@ -41,4 +43,4 @@ Claims tied to the paper are cited in the interface by section, figure, or table
 3. Open the **Actions** tab and let **Deploy static site to Pages** finish, or run it manually with **Run workflow**.
 4. Follow the deployment URL shown in the workflow summary. For a project repository, it normally has the form `https://OWNER.github.io/REPOSITORY/`.
 
-The workflow validates all files matching `js/*.js`, assembles only `index.html`, `css/`, `js/`, and `.nojekyll` into the Pages artifact, and deploys only after validation succeeds. `.nojekyll` keeps the published tree explicitly static.
+The workflow validates all files matching `js/*.js`, assembles `index.html`, `assets/`, `css/`, `js/`, and `.nojekyll` into the Pages artifact, and deploys only after validation succeeds. `.nojekyll` keeps the published tree explicitly static.

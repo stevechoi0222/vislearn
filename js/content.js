@@ -76,7 +76,7 @@
         short: "Where the bytes live",
         title: "Same graph, different address for the next comparison",
         body: "Before a query begins, DiskANN and AiSAQ hold the same graph topology and full vectors. The defining change is where each node's PQ code is laid out: one dataset-wide DRAM array in DiskANN, or repeated beside incoming references inside prebuilt AiSAQ SSD chunks.",
-        summary: "Nothing moves during this animation: it compares two indices as already built. DiskANN keeps all N PQ codes in DRAM; AiSAQ prebuilds neighbor PQ codes into SSD node chunks.",
+        summary: "No PQ bytes migrate at query time: this compares two indices as already built. DiskANN keeps all N PQ codes in DRAM; AiSAQ prebuilds neighbor PQ codes into SSD node chunks.",
         sourceLabel: "Paper §2.3–§3.1 and Figure 2 — data placement",
         sourceUrl: `${PAPER_URL}#page=4`,
         duration: 16,
@@ -85,7 +85,7 @@
         checkpoint: {
           prompt: "Pause: is AiSAQ moving PQ codes from DRAM to SSD while a query runs?",
           reveal: "No. The animation compares two already-built layouts. AiSAQ's index creator has stored each outneighbor's PQ code inside the current node's SSD chunk before search begins.",
-          confusionHint: "Read the two yards as alternative index layouts at rest, not as a before-and-after migration.",
+          confusionHint: "Read the two factory lanes as alternative index layouts at rest, not as a before-and-after migration.",
         },
         citations: [
           paperSource("§2.3 DiskANN node chunks", 2),
@@ -99,7 +99,7 @@
             shared: "Both indices use the same Vamana directed graph: the same nodes, edges, entrypoint, and query objective.",
             diskann: "DiskANN will traverse this graph with PQ distances and later re-rank visited nodes with full vectors.",
             aisaq: "AiSAQ will traverse the same graph with the same two vector roles and the same re-ranking step.",
-            difference: "No algorithmic difference yet. The logical graph is held constant; the decorative storage-yard backdrop is not a node-for-node graph trace.",
+            difference: "No algorithmic difference yet. The logical graph is held constant, and both factory lanes illuminate the same illustrative node-and-edge pattern.",
             cue: "align-graphs",
           },
           {

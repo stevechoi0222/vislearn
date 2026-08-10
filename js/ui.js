@@ -70,6 +70,7 @@
 
   function renderStage(state, stage) {
     $(".stage-wrap").dataset.stage = stage.id;
+    $("#hud-station").textContent = `${state.stageIndex + 1} / ${content.stages.length}`;
     $("#stage-count").textContent = `Stop ${state.stageIndex + 1} of ${content.stages.length}`;
     $("#stage-source-short").textContent = stage.sourceLabel.replace(/^Paper\s*/i, "").split("—")[0].trim();
     $("#stage-title").textContent = stage.title;
@@ -128,6 +129,14 @@
     const actionCount = `Action ${index + 1} of ${count}`;
 
     $("#scene-action-count").textContent = `Stage ${state.stageIndex + 1} · Action ${index + 1}/${count}`;
+    $("#hud-action").textContent = `${index + 1} / ${count}`;
+    $("#hud-query").textContent = state.stageIndex === 0
+      ? "index inspection"
+      : state.stageIndex <= 4
+        ? "query run"
+        : state.stageIndex === 5
+          ? "derivation"
+          : "evidence";
     $("#scene-action-label").textContent = phase.label;
     $("#scene-shared-cue").textContent = phase.shared;
     $("#guide-action-count").textContent = actionCount;
@@ -151,6 +160,7 @@
     $("#play-label").textContent = label;
     $("#play-icon").textContent = state.playing ? "Ⅱ" : "▶";
     $("#play").setAttribute("aria-label", `${label} simulation`);
+    $("#tour-start").textContent = state.stageIndex === 0 && state.progress < .01 ? "Run tour" : "Run again";
     const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
     $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
     $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
@@ -325,6 +335,20 @@
   }
 
   function bindControls(sim) {
+    const shell = $(".sim-shell");
+    function pinSimulationViewport() {
+      if (window.scrollY >= shell.offsetHeight) return;
+      const restore = () => {
+        const root = document.documentElement;
+        const previousBehavior = root.style.scrollBehavior;
+        root.style.scrollBehavior = "auto";
+        window.scrollTo(0, 0);
+        root.style.scrollBehavior = previousBehavior;
+      };
+      requestAnimationFrame(() => { restore(); requestAnimationFrame(restore); });
+    }
+    shell.addEventListener("click", pinSimulationViewport);
+
     $("#play").addEventListener("click", () => sim.playPause());
     $("#next").addEventListener("click", () => sim.next());
     $("#restart").addEventListener("click", () => sim.restart());
@@ -338,7 +362,29 @@
       $("#checkpoint-answer").hidden = false;
       $("#checkpoint").classList.add("active");
     });
-    $("#checkpoint-continue").addEventListener("click", () => sim.resume());
+    $("#checkpoint-continue").addEventListener("click", () => {
+      document.activeElement?.blur();
+      sim.resume();
+    });
+
+    const panelToggle = $("#panel-toggle");
+    const guideHandle = $("#guide-handle");
+    const guide = $("#learning-guide");
+    const guideBody = $("#guide-body");
+    const canvas = $("#yard");
+    function setGuideVisible(visible) {
+      shell.classList.toggle("guide-hidden", !visible);
+      panelToggle.setAttribute("aria-expanded", String(visible));
+      panelToggle.textContent = visible ? "Hide guide" : "Show guide";
+      guideHandle.setAttribute("aria-expanded", String(visible));
+      guideHandle.querySelector("span").textContent = visible ? "Details" : "Show details";
+      guideBody.inert = !visible;
+      if (!visible && !window.matchMedia("(max-width: 760px)").matches) guide.setAttribute("aria-hidden", "true");
+      else guide.removeAttribute("aria-hidden");
+      canvas.dispatchEvent(new CustomEvent("aisaq:panel-visibility", { detail: { visible } }));
+    }
+    panelToggle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden")));
+    guideHandle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden")));
 
     window.addEventListener("keydown", (event) => {
       const target = event.target;
@@ -369,6 +415,7 @@
   function renderView(state) {
     $(".stage-wrap").dataset.view = state.view;
     $("#learning-guide").dataset.view = state.view;
+    $("#hud-line").textContent = state.view === "split" ? "Both" : state.view === "diskann" ? "DiskANN" : "AiSAQ";
     $$("[data-method]").forEach((row) => {
       const prioritized = state.view !== "split" && row.dataset.method === state.view;
       row.classList.toggle("prioritized", prioritized);
@@ -398,16 +445,12 @@
       requestAnimationFrame(() => {
         const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         const behavior = reduced ? "auto" : "smooth";
-        if (window.matchMedia("(max-width: 1100px)").matches) {
-          checkpoint.scrollIntoView({ behavior, block: "center" });
-        } else {
-          const guideBody = $(".guide-body");
-          const bodyRect = guideBody.getBoundingClientRect();
-          const checkpointRect = checkpoint.getBoundingClientRect();
-          const centered = guideBody.scrollTop + checkpointRect.top - bodyRect.top - (guideBody.clientHeight - checkpointRect.height) / 2;
-          guideBody.scrollTo({ top: Math.max(0, centered), behavior });
-        }
-        $("#checkpoint-reveal").focus({ preventScroll: true });
+        const guideBody = $(".guide-body");
+        const bodyRect = guideBody.getBoundingClientRect();
+        const checkpointRect = checkpoint.getBoundingClientRect();
+        const centered = guideBody.scrollTop + checkpointRect.top - bodyRect.top - (guideBody.clientHeight - checkpointRect.height) / 2;
+        guideBody.scrollTo({ top: Math.max(0, centered), behavior });
+        if (!guideBody.inert && checkpoint.offsetParent !== null) $("#checkpoint-reveal").focus({ preventScroll: true });
       });
     }
 
