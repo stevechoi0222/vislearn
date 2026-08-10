@@ -68,6 +68,145 @@
     return fromSimulation || phasesFor(stage)[phaseIndexFor(sim, stage)];
   }
 
+  function clamp01(value) {
+    const numeric = Number(value);
+    return Math.max(0, Math.min(1, Number.isFinite(numeric) ? numeric : 0));
+  }
+
+  function traceSnapshot(sim, state, stage) {
+    if (typeof sim.traceSnapshot === "function") {
+      try {
+        const snapshot = sim.traceSnapshot();
+        if (snapshot && typeof snapshot === "object") return snapshot;
+      } catch (_error) {
+        // The text trace remains useful when a renderer/model revision lacks trace data.
+      }
+    }
+    const phase = phaseFor(sim, stage);
+    return {
+      stageIndex: state.stageIndex,
+      stageId: stage.id,
+      phaseIndex: phaseIndexFor(sim, stage),
+      phase,
+      phaseProgress: typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress,
+      scene: { family: phase.cue || "teaching-trace", stateLabel: phase.label },
+      currentEvent: null,
+      completedEvents: [],
+      allEvents: [],
+    };
+  }
+
+  function phaseSpan(sim, stage) {
+    if (typeof sim.phaseSpan === "function") {
+      try {
+        const span = sim.phaseSpan();
+        if (span && Number.isFinite(Number(span.start)) && Number.isFinite(Number(span.end))) {
+          return { start: clamp01(span.start), end: clamp01(span.end) };
+        }
+      } catch (_error) {
+        // Fall through to the content-derived phase weights.
+      }
+    }
+    const phases = phasesFor(stage);
+    const weights = phases.map((phase) => {
+      const value = Number(phase.duration ?? phase.weight);
+      return Number.isFinite(value) && value > 0 ? value : 1;
+    });
+    const total = weights.reduce((sum, value) => sum + value, 0) || 1;
+    const index = phaseIndexFor(sim, stage);
+    const start = weights.slice(0, index).reduce((sum, value) => sum + value, 0) / total;
+    const end = weights.slice(0, index + 1).reduce((sum, value) => sum + value, 0) / total;
+    return { start, end };
+  }
+
+  function eventBucket(event) {
+    const source = String(event?.source || "").toLowerCase();
+    const destination = String(event?.destination || "").toLowerCase();
+    const payload = String(event?.payload || "").toLowerCase();
+    const direction = String(event?.direction || "").toLowerCase();
+    if (source.includes("request-queue") || destination.includes(".ssd") || payload.includes("logical read") || direction === "down") return "request";
+    if (source.includes(".ssd") || payload.includes("4 kib unit") || direction === "up") return "return";
+    return "compute";
+  }
+
+  function chooseLaneEvent(events, bucket) {
+    const matching = events.filter((event) => eventBucket(event) === bucket);
+    return matching.find((event) => event.status === "current")
+      || [...matching].reverse().find((event) => event.status === "completed")
+      || matching.find((event) => event.status === "pending")
+      || null;
+  }
+
+  function writeTraceLane(bucket, event, fallback) {
+    const lane = $(`#trace-${bucket}-lane`);
+    const route = $(`#trace-${bucket}-route`);
+    if (!lane || !route) return;
+    const status = event?.status || fallback.status;
+    lane.dataset.status = ["pending", "current", "completed"].includes(status) ? status : "pending";
+    const source = event?.source || fallback.source;
+    const destination = event?.destination || fallback.destination;
+    route.textContent = `${source} → ${destination}`;
+
+    if (bucket === "request") {
+      $("#trace-request-address").textContent = event?.destination
+        ? `Address: ${event.destination}`
+        : "Address is symbolic unless supplied by the trace.";
+    } else if (bucket === "return") {
+      $("#trace-return-payload").textContent = event?.payload || fallback.payload;
+    } else {
+      const payload = String(event?.payload || fallback.payload);
+      const target = String(event?.destination || "");
+      if (payload.includes("scalar exact distance") || target.includes("exact-score")) {
+        $("#trace-candidate-queue").textContent = `Exact-score ledger · ${payload}`;
+      } else if (target.includes("seen-ids") || payload.toLowerCase().includes("dedup")) {
+        $("#trace-candidate-queue").textContent = `Seen-ID set · ${payload}`;
+      } else if (payload.includes("scalar PQ distance")) {
+        $("#trace-candidate-queue").textContent = `Candidate list L · ${payload}`;
+      } else {
+        $("#trace-candidate-queue").textContent = "Host state · L, seen IDs, exact-score ledger";
+      }
+    }
+  }
+
+  function renderTrace(state, stage, sim) {
+    const snapshot = traceSnapshot(sim, state, stage);
+    const phase = snapshot.phase || phaseFor(sim, stage);
+    const events = Array.isArray(snapshot.allEvents)
+      ? snapshot.allEvents
+      : Array.isArray(snapshot.events)
+        ? snapshot.events
+        : [];
+    const progress = clamp01(snapshot.phaseProgress ?? snapshot.progress ?? (typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress));
+    const percent = Math.round(progress * 100);
+    $("#trace-progress").textContent = `${percent}%`;
+    $("#trace-scrubber-value").textContent = `${percent}%`;
+    const scrubber = $("#trace-scrubber");
+    if (scrubber.dataset.scrubbing !== "true") scrubber.value = String(Math.round(progress * 1000));
+    scrubber.setAttribute("aria-valuetext", `${percent}% through ${phase?.label || "the current phase"}`);
+
+    const fallbacks = {
+      request: { status: events.length ? "pending" : "current", source: "host.request-queue", destination: "logical node-chunk address" },
+      return: { status: "pending", source: "SSD block", destination: "reusable DRAM scratch", payload: "Full vector + degree + neighbor IDs" },
+      compute: { status: "pending", source: "CPU LUT scorer", destination: "host.candidate-list", payload: "ID + scalar PQ distance + expansion flag" },
+    };
+    ["request", "return", "compute"].forEach((bucket) => writeTraceLane(bucket, chooseLaneEvent(events, bucket), fallbacks[bucket]));
+
+    const current = snapshot.currentEvent || events.find((event) => event.status === "current") || [...events].reverse().find((event) => event.status === "completed") || null;
+    $("#trace-event-id").textContent = current?.id || "not supplied";
+    $("#trace-event-window").textContent = current && Number.isFinite(Number(current.start)) && Number.isFinite(Number(current.end))
+      ? `${Math.round(Number(current.start) * 100)}–${Math.round(Number(current.end) * 100)}% of phase`
+      : "phase-relative";
+    $("#trace-fact-status").textContent = current?.factStatus || "illustrative trace";
+    const exactEvent = [...events].reverse().find((event) => String(event.payload || "").includes("ID + scalar exact distance"));
+    $("#trace-exact-queue").textContent = exactEvent?.payload || "Exact node ID + exact scalar distance (re-rank)";
+    $("#dock-phase-label").textContent = snapshot.stateLabel || snapshot.scene?.stateLabel || phase?.label || stage.title;
+
+    const summary = `Visual summary. Stage ${state.stageIndex + 1}, ${phase?.label || stage.title}. ${phase?.shared || stage.summary || "Both methods follow the same graph-search step."} Candidate list L, the seen-ID set, and the exact-score ledger remain separate host-side state.`;
+    $("#canvas-phase-summary").textContent = summary;
+    $("#yard").setAttribute("aria-label", `${summary} Teaching trace assumes a cache miss; CPU and OS caches are omitted.`);
+    return snapshot;
+  }
+
   function renderStage(state, stage) {
     $(".stage-wrap").dataset.stage = stage.id;
     $("#hud-station").textContent = `${state.stageIndex + 1} / ${content.stages.length}`;
@@ -147,7 +286,6 @@
     $("#phase-difference").textContent = phase.difference;
     $("#learning-guide").dataset.cue = phase.cue;
     $("#learning-guide").style.setProperty("--action-progress", String(Math.min(1, Math.max(0, progress))));
-    $("#canvas-phase-summary").textContent = `Visual summary. ${actionCount}: ${phase.label}. Common action: ${phase.shared} DiskANN: ${phase.diskann} AiSAQ: ${phase.aisaq} Why it differs: ${phase.difference}`;
     renderActionList(state, stage, index, sim);
 
     if (announce) {
@@ -160,7 +298,7 @@
     $("#play-label").textContent = label;
     $("#play-icon").textContent = state.playing ? "Ⅱ" : "▶";
     $("#play").setAttribute("aria-label", `${label} simulation`);
-    $("#tour-start").textContent = state.stageIndex === 0 && state.progress < .01 ? "Run tour" : "Run again";
+    $("#tour-start").textContent = state.stageIndex === 0 && state.progress < .01 ? "Run trace" : "Run again";
     const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
     $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
     $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
@@ -350,13 +488,59 @@
     shell.addEventListener("click", pinSimulationViewport);
 
     $("#play").addEventListener("click", () => sim.playPause());
+    $("#previous").addEventListener("click", () => {
+      if (typeof sim.previous === "function") sim.previous();
+      else if (typeof sim.goTo === "function") sim.goTo(Math.max(0, Number(sim.state?.stageIndex || 0) - 1));
+    });
     $("#next").addEventListener("click", () => sim.next());
+    $("#replay-phase").addEventListener("click", () => {
+      if (typeof sim.replayPhase === "function") {
+        sim.replayPhase();
+        return;
+      }
+      const span = phaseSpan(sim, sim.stage || content.stages[sim.state?.stageIndex || 0]);
+      if (typeof sim.setProgress === "function") sim.setProgress(span.start);
+      else {
+        sim.state.progress = span.start;
+        sim.state.playing = false;
+        if (typeof sim.emit === "function") sim.emit("replay");
+      }
+      if (!window.matchMedia("(prefers-reduced-motion: reduce)").matches && !sim.state.playing) sim.playPause();
+    });
     $("#restart").addEventListener("click", () => sim.restart());
     $("#speed").addEventListener("input", (event) => sim.setSpeed(event.target.value));
     $("#dataset-select").addEventListener("change", (event) => sim.setDataset(event.target.value));
     $("#follow").addEventListener("change", (event) => sim.setToggle("follow", event.target.checked));
     $("#labels").addEventListener("change", (event) => sim.setToggle("labels", event.target.checked));
+    $("#research-mode").addEventListener("change", (event) => {
+      document.body.dataset.detail = event.target.checked ? "research" : "beginner";
+      event.target.setAttribute("aria-checked", String(event.target.checked));
+    });
     $$('[data-view]').forEach((button) => button.addEventListener("click", () => sim.setView(button.dataset.view)));
+
+    const scrubber = $("#trace-scrubber");
+    function scrubTo(value) {
+      const stage = sim.stage || content.stages[sim.state?.stageIndex || 0];
+      const span = phaseSpan(sim, stage);
+      const fraction = clamp01(Number(value) / 1000);
+      const target = fraction >= 1
+        ? Math.max(span.start, span.end - 1e-6)
+        : span.start + fraction * Math.max(0, span.end - span.start);
+      if (typeof sim.setProgress === "function") sim.setProgress(target);
+      else {
+        sim.state.progress = clamp01(target);
+        sim.state.playing = false;
+        if (typeof sim.emit === "function") sim.emit("scrub");
+      }
+    }
+    scrubber.addEventListener("pointerdown", () => { scrubber.dataset.scrubbing = "true"; });
+    scrubber.addEventListener("input", (event) => {
+      scrubber.dataset.scrubbing = "true";
+      scrubTo(event.target.value);
+    });
+    ["change", "pointerup", "pointercancel", "blur"].forEach((name) => scrubber.addEventListener(name, () => {
+      delete scrubber.dataset.scrubbing;
+    }));
     $("#checkpoint-reveal").addEventListener("click", () => {
       if (sim.state.playing) sim.playPause();
       $("#checkpoint-answer").hidden = false;
@@ -372,19 +556,27 @@
     const guide = $("#learning-guide");
     const guideBody = $("#guide-body");
     const canvas = $("#yard");
-    function setGuideVisible(visible) {
+    function setGuideVisible(visible, userInitiated) {
       shell.classList.toggle("guide-hidden", !visible);
       panelToggle.setAttribute("aria-expanded", String(visible));
-      panelToggle.textContent = visible ? "Hide guide" : "Show guide";
+      panelToggle.textContent = visible ? "Hide inspector" : "Show inspector";
       guideHandle.setAttribute("aria-expanded", String(visible));
-      guideHandle.querySelector("span").textContent = visible ? "Details" : "Show details";
+      guideHandle.querySelector("span").textContent = visible ? "Close learning inspector" : "Open learning inspector";
       guideBody.inert = !visible;
       if (!visible && !window.matchMedia("(max-width: 760px)").matches) guide.setAttribute("aria-hidden", "true");
       else guide.removeAttribute("aria-hidden");
+      if (userInitiated) guide.dataset.userToggled = "true";
       canvas.dispatchEvent(new CustomEvent("aisaq:panel-visibility", { detail: { visible } }));
     }
-    panelToggle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden")));
-    guideHandle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden")));
+    panelToggle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden"), true));
+    guideHandle.addEventListener("click", () => setGuideVisible(shell.classList.contains("guide-hidden"), true));
+    const compactGuide = window.matchMedia("(max-width: 760px)");
+    setGuideVisible(!compactGuide.matches, false);
+    const syncGuideBreakpoint = (event) => {
+      if (!guide.dataset.userToggled) setGuideVisible(!event.matches, false);
+    };
+    if (typeof compactGuide.addEventListener === "function") compactGuide.addEventListener("change", syncGuideBreakpoint);
+    else if (typeof compactGuide.addListener === "function") compactGuide.addListener(syncGuideBreakpoint);
 
     window.addEventListener("keydown", (event) => {
       const target = event.target;
@@ -436,6 +628,7 @@
     bindControls(sim);
 
     let lastPhaseKey = null;
+    let lastStageIndex = null;
 
     function surfaceCheckpoint(stage) {
       const checkpoint = $("#checkpoint");
@@ -455,16 +648,17 @@
     }
 
     sim.subscribe((state, stage, reason) => {
-      if (["init", "stage", "restart", "complete"].includes(reason)) renderStage(state, stage);
-      if (["init", "stage", "phase", "restart", "complete"].includes(reason)) {
-        const phase = phaseFor(sim, stage);
-        const phaseKey = `${state.stageIndex}:${phase.id}`;
-        const isActualTransition = lastPhaseKey !== null && phaseKey !== lastPhaseKey;
-        renderPhase(state, stage, sim, isActualTransition);
-        lastPhaseKey = phaseKey;
-      }
+      const stageChanged = lastStageIndex === null || lastStageIndex !== state.stageIndex;
+      if (stageChanged || ["init", "stage", "restart", "complete"].includes(reason)) renderStage(state, stage);
+      const phase = phaseFor(sim, stage);
+      const phaseKey = `${state.stageIndex}:${phase.id}`;
+      const isActualTransition = lastPhaseKey !== null && phaseKey !== lastPhaseKey;
+      renderPhase(state, stage, sim, isActualTransition);
+      lastPhaseKey = phaseKey;
+      lastStageIndex = state.stageIndex;
       if (reason === "checkpoint") surfaceCheckpoint(stage);
       renderPlayback(state, sim);
+      renderTrace(state, stage, sim);
       if (["init", "dataset"].includes(reason)) renderDataset(state.dataset, reason === "dataset");
       if (["init", "speed"].includes(reason)) $("#speed-value").textContent = `${state.speed}×`;
       if (["init", "view"].includes(reason)) renderView(state);
@@ -475,6 +669,7 @@
         const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
         $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
         $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
+        renderTrace(state, sim.stage || content.stages[state.stageIndex], sim);
       },
     };
   }

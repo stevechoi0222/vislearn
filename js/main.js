@@ -15,8 +15,9 @@
   const simulation = new window.AiSAQSimulation(window.AISAQ_CONTENT.stages);
   const renderer = window.createAiSAQRenderer(canvas);
   const ui = window.bindAiSAQUI(simulation);
-  window.AISAQ_APP = Object.freeze({ simulation, renderer });
+  window.AISAQ_APP = Object.freeze({ simulation, renderer, ui });
   let last = performance.now();
+  let stageVisible = true;
 
   function resize() {
     const rect = wrap.getBoundingClientRect();
@@ -28,6 +29,11 @@
   resize();
 
   function frame(now) {
+    requestAnimationFrame(frame);
+    if (!stageVisible || document.hidden) {
+      last = now;
+      return;
+    }
     const seconds = Math.min(.05, Math.max(0, (now - last) / 1000));
     last = now;
     const advanced = simulation.update(seconds);
@@ -39,10 +45,18 @@
       phase: simulation.currentPhase(),
       phaseIndex: simulation.phaseIndex(),
       phaseProgress: simulation.phaseProgress(),
+      trace: typeof simulation.traceSnapshot === "function" ? simulation.traceSnapshot() : null,
     });
-    requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
+
+  if ("IntersectionObserver" in window) {
+    const visibilityObserver = new IntersectionObserver((entries) => {
+      stageVisible = entries.some((entry) => entry.isIntersecting);
+      last = performance.now();
+    }, { rootMargin: "160px 0px" });
+    visibilityObserver.observe(wrap);
+  }
 
   const followToggle = document.getElementById("follow");
   function disengageFollow() {

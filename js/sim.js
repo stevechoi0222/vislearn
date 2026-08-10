@@ -80,6 +80,89 @@
       return timeline[this.phaseIndex()].phase;
     }
 
+    phaseSpan(stageIndex, phaseIndex) {
+      const hasStage = stageIndex !== undefined && stageIndex !== null && Number.isFinite(Number(stageIndex));
+      const requestedStage = hasStage ? Math.trunc(Number(stageIndex)) : this.state.stageIndex;
+      const targetStage = Math.max(0, Math.min(this.stages.length - 1, requestedStage));
+      const timeline = this._timeline(this.stages[targetStage]);
+      const hasPhase = phaseIndex !== undefined && phaseIndex !== null && Number.isFinite(Number(phaseIndex));
+      const requestedPhase = hasPhase
+        ? Math.trunc(Number(phaseIndex))
+        : (targetStage === this.state.stageIndex ? this.phaseIndex() : 0);
+      const targetPhase = Math.max(0, Math.min(timeline.length - 1, requestedPhase));
+      const span = timeline[targetPhase];
+      const progress = targetStage === this.state.stageIndex && targetPhase === this.phaseIndex()
+        ? this.phaseProgress()
+        : 0;
+      return {
+        stageIndex: targetStage,
+        phaseIndex: targetPhase,
+        phase: span.phase,
+        start: span.start,
+        end: span.end,
+        progress,
+      };
+    }
+
+    traceSnapshot() {
+      const span = this.phaseSpan();
+      const phase = span.phase || {};
+      const trace = phase.trace || {};
+      const sourceEvents = Array.isArray(trace.events) ? trace.events : [];
+      const phaseProgress = span.progress;
+      const allEvents = sourceEvents.map((event, index) => {
+        const start = Math.max(0, Math.min(1, Number(event.at) || 0));
+        const nextAt = sourceEvents[index + 1] && Number(sourceEvents[index + 1].at);
+        const end = Number.isFinite(nextAt) ? Math.max(start, Math.min(1, nextAt)) : 1;
+        const completed = phaseProgress >= 1 - EPSILON || phaseProgress >= end - EPSILON;
+        const current = !completed && phaseProgress >= start - EPSILON;
+        const eventProgress = completed
+          ? 1
+          : current
+            ? Math.max(0, Math.min(1, (phaseProgress - start) / Math.max(EPSILON, end - start)))
+            : 0;
+        return Object.assign({}, event, {
+          index,
+          start,
+          end,
+          status: completed ? "completed" : current ? "current" : "pending",
+          progress: eventProgress,
+        });
+      });
+      const normalize = (value) => String(value || "").toLowerCase().replace(/[^a-z0-9]/g, "");
+      const presets = window.AISAQ_CONTENT && Array.isArray(window.AISAQ_CONTENT.blockPackingPresets)
+        ? window.AISAQ_CONTENT.blockPackingPresets
+        : [];
+      const selected = normalize(this.state.dataset);
+      const preset = presets.find((item) => normalize(item.id) === selected || normalize(item.label) === selected);
+      const dataset = preset ? {
+        id: preset.id,
+        label: preset.label,
+        paperInputs: preset.paperInputs,
+        derivationAssumptions: preset.derivationAssumptions,
+        derived: preset.derived,
+      } : null;
+      return {
+        stageIndex: this.state.stageIndex,
+        stageId: this.stage && this.stage.id,
+        phaseIndex: span.phaseIndex,
+        phase,
+        sceneFamily: trace.sceneFamily || "layout",
+        stateLabel: trace.stateLabel || phase.label || "TRACE",
+        scene: {
+          family: trace.sceneFamily || "layout",
+          stateLabel: trace.stateLabel || phase.label || "TRACE",
+        },
+        phaseProgress,
+        progress: phaseProgress,
+        currentEvent: allEvents.find((event) => event.status === "current") || null,
+        completedEvents: allEvents.filter((event) => event.status === "completed"),
+        events: allEvents,
+        allEvents,
+        dataset,
+      };
+    }
+
     subscribe(listener) {
       this.listeners.add(listener);
       listener(this.state, this.stage, "init");
@@ -229,6 +312,29 @@
       if (targetStage !== oldStageIndex) this.emit("stage");
       else if (targetPhase !== oldPhaseIndex) this.emit("phase");
       else this.emit("step");
+    }
+
+    setProgress(value) {
+      const numeric = Number(value);
+      this.state.progress = Math.max(0, Math.min(1, Number.isFinite(numeric) ? numeric : 0));
+      this.state.elapsed = 0;
+      this.state.playing = false;
+      this.state.checkpointPaused = this.state.progress >= 1 - EPSILON;
+      if (this.state.checkpointPaused) this.checkedStages.add(this.state.stageIndex);
+      else this.checkedStages.delete(this.state.stageIndex);
+      this.emit("scrub");
+      return this.traceSnapshot();
+    }
+
+    replayPhase() {
+      const span = this.phaseSpan();
+      this.state.progress = span.start;
+      this.state.elapsed = 0;
+      this.state.checkpointPaused = false;
+      this.checkedStages.delete(this.state.stageIndex);
+      this.state.playing = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      this.emit("replay");
+      return this.traceSnapshot();
     }
 
     restart() {

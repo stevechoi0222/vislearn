@@ -1,21 +1,26 @@
 ---
-name: Vector Search Works
-description: A full-screen, seven-station vector-search factory that makes the DiskANN and AiSAQ data-placement comparison visible, controllable, and evidence-backed.
+name: Byte Transit Observatory
+description: A visual-first systems observatory for tracing one DiskANN and AiSAQ graph-search hop across memory boundaries.
 colors:
+  observatory: "#071014"
+  observatory-raised: "#0b171c"
+  panel: "#101e24"
+  panel-raised: "#152830"
   ink: "#142a37"
-  ink-2: "#213c4a"
   paper: "#f4f0e7"
   concrete: "#e4dfd3"
   warm-white: "#fffdf7"
-  cobalt: "#3168d8"
-  cobalt-deep: "#1c4da8"
-  mint: "#4aae9b"
-  mint-deep: "#247666"
-  signal-yellow: "#f5c84c"
-  signal-yellow-deep: "#b98706"
-  coral: "#d85d49"
+  comparison-cobalt: "#4f7fe8"
+  comparison-mint: "#55c7ad"
+  tier-dram: "#5a82ef"
+  tier-ssd: "#35c8b0"
+  tier-cpu: "#f5c84c"
+  full-vector: "#ec7c68"
+  id-field: "#d8e1de"
+  caveat: "#d85d49"
   muted: "#58707a"
   line: "#b8b6ae"
+  steel: "#84a0aa"
 typography:
   display:
     fontFamily: "Avenir Next Condensed, Arial Narrow, Roboto Condensed, sans-serif"
@@ -25,16 +30,10 @@ typography:
     letterSpacing: "-0.025em"
   headline:
     fontFamily: "Avenir Next Condensed, Arial Narrow, Roboto Condensed, sans-serif"
-    fontSize: "clamp(1.7rem, 2.4vw, 2.55rem)"
+    fontSize: "1.43rem"
     fontWeight: 700
-    lineHeight: 0.93
-    letterSpacing: "-0.025em"
-  title:
-    fontFamily: "Avenir Next, Avenir, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: "1.3rem"
-    fontWeight: 700
-    lineHeight: 1.55
-    letterSpacing: "normal"
+    lineHeight: 0.98
+    letterSpacing: "-0.02em"
   body:
     fontFamily: "Avenir Next, Avenir, Segoe UI, Helvetica, Arial, sans-serif"
     fontSize: "1rem"
@@ -43,245 +42,186 @@ typography:
     letterSpacing: "normal"
   label:
     fontFamily: "Avenir Next, Avenir, Segoe UI, Helvetica, Arial, sans-serif"
-    fontSize: "0.78rem"
+    fontSize: "0.65rem"
     fontWeight: 750
-    lineHeight: 1.55
+    lineHeight: 1.35
     letterSpacing: "normal"
   data:
     fontFamily: "SFMono-Regular, Consolas, Liberation Mono, monospace"
-    fontSize: "0.68rem"
+    fontSize: "0.59rem"
     fontWeight: 700
-    lineHeight: 1.55
+    lineHeight: 1.35
     letterSpacing: "normal"
 rounded:
-  sm: "7px"
-  md: "8px"
-  action: "9px"
-  lg: "10px"
+  none: "0"
+  trace: "2px"
+  control: "3px"
+  diagram: "4px"
   round: "50%"
 spacing:
-  xs: "3px"
-  sm: "7px"
-  md: "10px"
-  lg: "18px"
-  xl: "24px"
+  trace-gap: "4px"
+  control-gap: "7px"
+  panel-pad: "14px"
   section-inline: "clamp(22px, 7vw, 110px)"
   section-block: "clamp(72px, 9vw, 130px)"
 components:
   button-primary:
-    backgroundColor: "{colors.signal-yellow}"
-    textColor: "{colors.ink}"
+    backgroundColor: "{colors.tier-cpu}"
+    textColor: "{colors.observatory}"
     typography: "{typography.label}"
-    rounded: "{rounded.lg}"
-    padding: "7px 12px"
-  button-action:
-    backgroundColor: "{colors.signal-yellow}"
-    textColor: "{colors.ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.action}"
-    padding: "11px 17px"
-  button-checkpoint:
-    backgroundColor: "{colors.warm-white}"
-    textColor: "{colors.ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sm}"
+    rounded: "{rounded.none}"
     padding: "6px 9px"
-  chip-selected:
-    backgroundColor: "{colors.mint}"
-    textColor: "{colors.ink}"
-    typography: "{typography.label}"
-    rounded: "{rounded.sm}"
-    padding: "7px 9px"
-  navigation-rail:
-    backgroundColor: "{colors.ink}"
+  button-control:
+    backgroundColor: "{colors.panel-raised}"
     textColor: "{colors.warm-white}"
-    padding: "0 24px"
-    height: "64px"
-  guide-panel:
-    backgroundColor: "{colors.warm-white}"
-    textColor: "{colors.ink}"
-    padding: "18px 24px 26px"
+    typography: "{typography.data}"
+    rounded: "{rounded.none}"
+    padding: "6px 9px"
+  trace-ledger:
+    backgroundColor: "{colors.observatory}"
+    textColor: "{colors.warm-white}"
+    rounded: "{rounded.none}"
+    padding: "7px 9px"
+  inspector:
+    backgroundColor: "{colors.panel}"
+    textColor: "{colors.warm-white}"
+    rounded: "{rounded.none}"
+    padding: "12px 14px"
 ---
 
-# Design System: Vector Search Works
+# Design System: Byte Transit Observatory
 
 ## Overview
 
-**Creative North Star: "The Seven-Station Vector Factory"**
+**Creative North Star: "The Byte Transit Observatory"**
 
-The Seven-Station Vector Factory treats memory placement as an industrial logistics problem. One continuous isometric floor turns the paper into a route through Index Layout, Query Entry, SSD Read, PQ Scoring, Loop and Re-rank, 4 KB Packing, and Evidence and Limits. Every station contains a cobalt DiskANN machine and a mint AiSAQ machine operating on the same logical query. Signal-yellow PQ packets and query pods make the shared work visible while the paired machinery exposes the one defining difference: where the codes are fetched from.
+The first viewport behaves like a systems instrument, not a conventional hero. A dark Canvas cutaway exposes two synchronized method lanes and shared CPU, DRAM, and SSD tiers. A slim semantic ledger names the current request, return, or compute event; the inspector and dock recede until the learner asks for explanation or control.
 
-The full-screen Canvas is framed by an overlay header and HUD, a right-side inspector, and a bottom control dock. Matte concrete, ink machinery, condensed headings, mono data labels, and restrained tonal shading make the experience feel like a precise operating console. Limited gradients clarify the sky, header fade, and active controls; they never replace the hard-edged procedural geometry or turn the interface into glossy dashboard decoration.
+The visual system is precise rather than photorealistic: hard planes, compact data labels, directional arrows, symbolic addresses, and restrained highlights. The Canvas carries the mechanism; DOM overlays carry accessibility, paper scope, and exact state.
 
 **Key Characteristics:**
 
-- One procedural low-poly factory with seven persistent stations and paired method machines.
-- Synchronized yellow query pods travelling one route through both implementations.
-- Semantic cargo colors that retain one meaning across Canvas, controls, evidence, and feedback.
-- Condensed industrial headlines paired with calm body copy and tabular mono data.
-- Overlay HUD, inspector, and transport dock that preserve the factory as the dominant first viewport.
-- Ambient factory activity separated from phase-specific machine and payload motion.
-- Explicit paper evidence, checkpoints, and reduced-motion behavior integrated into the visual system.
+- Canvas-dominant first viewport with synchronized semantic trace.
+- Two fixed method lanes over common memory-tier geometry.
+- Beginner explanation first; research fields appear only on request.
+- Paper-backed, derived, and illustrative information remain distinguishable.
+- Editorial labs and evidence retain the warm paper/cobalt/mint system below the viewport.
 
 ## Colors
 
-The palette combines a dark maritime utility rail with warm drafting-paper neutrals and three high-contrast operational signals.
+The observatory uses dark blue-black surfaces under low ambient light; semantic payload colors remain bright enough to follow across tiers.
 
 ### Primary
 
-- **Signal Cargo Yellow** (`colors.signal-yellow`): active transport controls, progress, selected states, PQ cargo, query vehicles, focus outlines, and the concept-spine field.
-- **Deep Signal Ochre** (`colors.signal-yellow-deep`): borders and dimensional accents that keep yellow controls and cargo legible.
+- **CPU Signal** (`#f5c84c`): active bytes, CPU work, progress, selection, and focus.
+- **DRAM Transit** (`#5a82ef`): DRAM tier boundaries and paths in both method lanes.
+- **SSD Transit** (`#35c8b0`): SSD tier boundaries, aligned read units, and return paths in both lanes.
 
 ### Secondary
 
-- **DRAM Cobalt** (`colors.cobalt`): DiskANN memory, graph evidence, block fills, machine accents, and the DiskANN side of every paired station.
-- **Warehouse Cobalt** (`colors.cobalt-deep`): dimensional faces, links, and source actions associated with DiskANN or resident data.
-
-### Tertiary
-
-- **SSD Mint** (`colors.mint`): AiSAQ storage, enabled toggles, correct feedback, machine accents, and the AiSAQ side of every paired station.
-- **Deep SSD Mint** (`colors.mint-deep`): benefit panels, truth-note headings, and structural faces associated with AiSAQ.
-- **Tradeoff Coral** (`colors.coral`): explicit cost, limitation, or incorrect-answer states; it is never used as ambient decoration.
+- **Comparison Cobalt** (`#4f7fe8`) and **Comparison Mint** (`#55c7ad`): supporting comparison accents in controls and editorial evidence.
+- **Full Vector Coral** (`#ec7c68`): full-vector payload and exact-score path.
+- **ID Field** (`#d8e1de`): degree and neighbor-ID fields.
+- **Caveat Coral** (`#d85d49`): limits, costs, and incorrect recall feedback.
 
 ### Neutral
 
-- **Freight Ink** (`colors.ink`): primary text, utility rails, dark learning sections, hard edges, and the deepest Canvas strokes.
-- **Raised Ink** (`colors.ink-2`): secondary navigation surfaces and dark tonal layering.
-- **Drafting Paper** (`colors.paper`): the main editorial page field.
-- **Yard Concrete** (`colors.concrete`): the simulation ground and neutral tradeoff field.
-- **Warm Evidence White** (`colors.warm-white`): guide panels, evidence surfaces, readable labels, and inverse text.
-- **Muted Steel Copy** (`colors.muted`): explanatory prose, metadata, and low-priority evidence.
-- **Survey Line** (`colors.line`): dividers and boundaries on light surfaces.
+- **Observatory** (`#071014`) and **Raised Observatory** (`#0b171c`): first-viewport field.
+- **Panel** (`#101e24`) and **Raised Panel** (`#152830`): ledger, inspector, and dock planes.
+- **Drafting Paper** (`#f4f0e7`), **Concrete** (`#e4dfd3`), and **Warm White** (`#fffdf7`): learning sections and evidence.
+- **Freight Ink** (`#142a37`), **Muted Copy** (`#58707a`), and **Steel** (`#84a0aa`): editorial text and dividers.
 
-**The Cargo Color Rule.** Signal Cargo Yellow always means query movement, PQ cargo, active progress, selection, or focus; it is not a decorative wash.
+**The Tier Color Rule.** Yellow means CPU/active work, periwinkle means DRAM, teal means SSD, and coral means full-vector exact work or caveat depending on context.
 
-**The Fixed Address Rule.** Cobalt remains DiskANN and DRAM, mint remains AiSAQ and SSD, and coral remains cost or error across every medium.
+**The Method Identity Rule.** DiskANN and AiSAQ are identified by fixed lane, name, and marker shape. Never rely on a memory-tier color to identify a method.
 
 ## Typography
 
-**Display Font:** Avenir Next Condensed (with Arial Narrow, Roboto Condensed, and sans-serif fallbacks)
+**Display Font:** Avenir Next Condensed with Arial Narrow and Roboto Condensed fallbacks.
 
-**Body Font:** Avenir Next (with Avenir, Segoe UI, Helvetica, Arial, and sans-serif fallbacks)
-**Label/Mono Font:** SFMono-Regular (with Consolas, Liberation Mono, and monospace fallbacks)
+**Body Font:** Avenir Next with Avenir, Segoe UI, Helvetica, and Arial fallbacks.
 
-**Character:** Condensed display type behaves like industrial signage: broad enough for dramatic section markers but compact enough for the simulation guide. The body stack stays neutral and generous, while monospaced numerals make measurements, stages, and addresses read as operational data.
+**Data Font:** SFMono-Regular with Consolas and Liberation Mono fallbacks
+
+Condensed type behaves like equipment labeling and section signage. The body stack explains concepts at a calm reading rhythm; the mono stack is reserved for addresses, records, phase counters, bytes, and measurements.
 
 ### Hierarchy
 
-- **Display** (700, fluid 2.25–5.25rem, 0.96 line-height): major editorial section headings; keep the measure at or below 780px.
-- **Headline** (700, fluid 1.7–2.55rem, 0.93 line-height): the current simulation stop and compact panel headlines.
-- **Title** (700, 1.3rem, 1.55 line-height): balance panels and local content groups.
-- **Body** (400, 1rem, 1.55 line-height): explanations and evidence context; explanatory measures stop at 64–68ch.
-- **Label** (750, 0.78rem): controls, presets, and compact operational language; uppercase is reserved for metadata or physical labeling.
-- **Data** (700, 0.68rem, tabular numerals where available): stage counts, measurements, outputs, addresses, and chart labels.
+- **Display** (700, fluid 2.25–5.25rem, 0.96): below-the-fold section landmarks.
+- **Headline** (700, 1.43rem, 0.98): inspector phase title.
+- **Body** (400, 1rem, 1.55): explanations, generally limited to 68–75ch.
+- **Label** (750, approximately 0.65rem): controls and compact operational copy.
+- **Data** (700, approximately 0.59rem, tabular): trace routes, symbolic addresses, bytes, distances, and evidence state.
 
-**The Condensed Infrastructure Rule.** Use condensed type for landmarks and large values, not for paragraphs; long explanations stay in the body stack.
-
-**The Numbers Are Cargo Rule.** Measurements use the mono stack and tabular numerals so changing values do not jitter or lose alignment.
+**The Data Has Meaning Rule.** Monospace is used only for state, code-like records, addresses, and measurement—not as generic technical decoration.
 
 ## Layout
 
-The first viewport is a working surface, not a conventional hero. The simulation occupies one full small viewport height (`100svh`) with the procedural Canvas fixed to the entire factory surface. A dark overlay header places the brand at left, the live line/station/action/query HUD in the middle, and paper, accuracy, and guide controls at right. The Canvas remains visible behind a live ledger at upper left, a compact scene-status placard near the top center, camera controls on the left edge, a right inspector clamped to 360–430px, and a bottom transport dock that fills the remaining width.
+The first viewport fills `100svh`. At wide desktop, the Canvas occupies the field behind a 58px top bar, a trace ledger capped near 310px at upper left, a 300–338px right inspector, and a 108px bottom dock that expands when the inspector closes. A compact scene title and paper-scope badge sit over unused Canvas space rather than consuming rows.
 
-Editorial sections use generous fluid padding (`spacing.section-block` and `spacing.section-inline`) and an intentionally varied sequence of yellow, ink, white, concrete, and teal fields. Internal grids respond to the information: four-step flow, control-plus-block lab, evidence chart-plus-table, balanced tradeoff, two-column quiz, and three-column source ledger. Explanatory copy generally stops at 68ch.
+The cutaway maintains two method lanes while applying the same CPU, DRAM, and SSD tier structure to both. Seven learning stages change the active event family without replacing the spatial model.
 
-Hiding the inspector expands the dock and recenters the camera in the newly available Canvas area. At narrower desktop widths, low-priority HUD items and transport toggles are removed before the core run, pause, step, restart, dataset, and speed controls. At 760px and below, the header and HUD become two compact rows, the inspector becomes a bottom sheet above a two-row transport dock, and the sheet collapses to a visible 32px handle instead of leaving the factory. Dataset, speed, method view, and toggles are hidden from the compact dock; the same paired machines remain on the same single floor. Nonessential labels and the method key disappear as space tightens, while the active station remains labeled. Editorial evidence, tradeoffs, quiz choices, and sources stack below the simulation without horizontal scrolling.
-
-**The Same Route Rule.** DiskANN and AiSAQ remain paired inside every station and travel the same seven-stop route; responsive framing may hide controls or labels but never split them into unrelated searches.
+At 1180px and 900px, low-priority dock and HUD controls disappear before the trace or Canvas is reduced. At 760px and below, the top bar becomes two rows, the inspector defaults to a 44px bottom-sheet peek, the dock becomes a compact 148px stack, and primary controls keep 44px targets. Research detail remains opt-in. Editorial sections stack without horizontal scrolling.
 
 ## Elevation & Depth
 
-Depth is a hybrid of isometric massing, tonal face shading, dark edge strokes, and blunt offset shadows. The Canvas floor and machines remain matte. Semi-opaque overlay surfaces use restrained blur only to keep text readable over moving geometry; their borders and compact radii retain the industrial-console character.
+Depth comes from Canvas tier planes, one-pixel boundaries, darker raised surfaces, and blunt offset shadows. Soft shadows separate the inspector and dock from moving geometry; glow is limited to an active payload or query signal.
 
 ### Shadow Vocabulary
 
-- **Header Fade:** a dark vertical fade separates the overlay brand and HUD from the Canvas without creating a solid page band.
-- **Inspector Lift** (`0 18px 52px rgba(0, 0, 0, .34)`): keeps the right explanation surface legible over factory motion.
-- **Dock Lift** (`0 15px 38px rgba(0, 0, 0, .34)`): anchors the bottom transport controls to the working surface.
-- **Yard Label Offset** (`5px 7px 0 rgba(20, 42, 55, .18)`): gives physical labels a printed placard character.
-- **Ledger Edge:** thin dark borders and opaque-enough ink fields keep live numbers readable without a floating-card shadow.
-- **Control Lift** (`0 5px 10px rgba(0, 0, 0, .18)`): gives transport buttons restrained tactility.
-- **Balance Mass** (`10px 13px 0 rgba(20, 42, 55, .14)`): supports the deliberate weight metaphor in the tradeoff section.
+- **Ledger Offset** (`8px 10px 0 rgba(0,0,0,.2)`): makes the semantic trace read as a fixed instrument.
+- **Inspector Lift** (`0 18px 46px rgba(0,0,0,.38)`): separates explanation from the cutaway.
+- **Dock Lift** (`0 16px 34px rgba(0,0,0,.38)`): anchors transport controls.
+- **Control Offset** (`4px 5px 0 #71550a`): gives the primary Run Trace action tactile weight.
 
-**The Matte Massing Rule.** Convey hierarchy with planes, edges, and purposeful offset shadows. Blur and glow are reserved for overlay legibility and the active yellow query signal, never for generic card decoration.
+**The Instrument Plane Rule.** Use borders and tonal planes first; reserve a shadow for an overlay that must remain legible over the Canvas.
 
 ## Shapes
 
-The form language is industrial and rectilinear. Canvas buildings, node chunks, cargo, plots, and evidence blocks are hard-edged low-poly volumes with visible strokes and flat-shaded faces. Editorial sections and primary panels keep square corners; their boundaries are created through fields, rules, and borders rather than rounded cards.
-
-Interactive elements use small, functional radii: 7px for compact chips and checkpoint buttons, 8px for selectors and segmented endpoints, 9px for the principal recall action, and 10px for transport controls and the view-mode shell. Circular shapes are reserved for route numbers, concept steps, wheels, and focus pulses. This contrast keeps rounded geometry synonymous with state, sequence, or movement.
-
-**The No Bubble Panels Rule.** Round the control in the hand, not the industrial surface it operates.
+The observatory is rectilinear. Ledger lanes, panels, tier boxes, aligned read units, and controls use square corners or 2–4px functional rounding. Circles are reserved for numbered phase nodes and small route signals. DiskANN and AiSAQ marker shapes remain distinct even without color.
 
 ## Components
 
-### Buttons
+### Observatory Canvas
 
-- **Shape:** compact controls use a tactile 7–10px radius; large flat panels do not inherit that rounding.
-- **Primary:** Signal Cargo Yellow on Freight Ink, with a deep-ochre border and strong label weight. Transport controls use 7px 12px padding; the recall action uses 11px 17px.
-- **Hover / Focus:** hover lifts transport controls by 1px; every interactive element receives a 3px yellow focus outline with a 3px offset.
-- **Secondary / Ghost:** secondary controls use a dark steel surface with a visible border; reset and utility actions may be transparent but retain an underline or clear label.
+The signature Canvas shows three separate host records—candidate list `L`, seen IDs, and the exact-score ledger—beside CPU scoring, reusable DRAM scratch, and aligned SSD units in paired method lanes. Query `q` and LUT state stay host-side. Request arrows travel down; returned read units travel up; scoring and commit movement is lateral. Numeric addresses are never synthesized.
 
-### Chips
+### Trace Ledger
 
-- **Style:** compact toggles use a dark rail surface, 7px radius, steel border, and 7px 9px padding.
-- **State:** selected toggles switch to SSD Mint with Freight Ink text; view and preset segments switch to Signal Cargo Yellow.
+Three ordered lanes report Request/Address, Data Return, and Compute/Commit. Pending, current, and completed opacity mirrors `traceSnapshot()`. Research mode adds event ID, phase window, evidence status, and the exact-record description.
 
-### Cards / Containers
+### Learning Inspector
 
-- **Corner Style:** square by default; the system prefers field changes and rules over freestanding rounded cards.
-- **Background:** Warm Evidence White for learning/evidence, Freight Ink for labs, Drafting Paper for sources, and Yard Concrete for neutral mechanism framing.
-- **Shadow Strategy:** only placards, live overlays, controls, and metaphorical weight panels use the documented structural shadows.
-- **Border:** one-pixel steel or survey-line dividers organize dense data; important boundaries use a 2–4px semantic top rule.
-- **Internal Padding:** compact panels use 16–24px; editorial sections use the fluid section spacing tokens.
+The narrow right inspector begins with plain-language stage purpose, then bilateral DiskANN/AiSAQ explanation, paper link, checkpoint, and route. On mobile it is a bottom sheet that defaults to a visible collapsed handle.
 
-### Inputs / Fields
+### Transport Dock
 
-- **Style:** dark selectors carry a visible steel border and 8px radius; range inputs use the native control with a yellow accent; quiz radios hide the native circle but preserve the semantic input.
-- **Focus:** the global 3px yellow outline remains visible on selectors, ranges, buttons, links, and custom radio/toggle surfaces.
-- **Error / Disabled:** quiz errors turn coral with a lighter coral border; correct states turn mint. Controls are not visually disabled merely because the simulation is paused.
+Run Trace, Previous, Play/Pause, Next, Replay Phase, phase scrubber, and overall progress are primary. View, dataset, speed, follow, labels, restart, and Research detail remain available as space permits. Native range and checkbox controls preserve keyboard behavior.
 
-### Overlay Header and HUD
+### Scope Badge
 
-The header floats over the factory rather than consuming a layout row. A three-bar industrial mark and the “Vector Search Works” wordmark occupy the left edge. Four mono HUD cells report line, station, action, and query state from the same simulation snapshot. Paper, accuracy, and guide controls remain compact on the right; mobile keeps the brand, short actions, and all four HUD values in two rows.
+The badge states that arXiv v2 evaluated the full-inline layout and that the teaching trace models a cache miss while omitting CPU/OS cache internals.
 
-### Seven-Station Vector Factory
+### Editorial Components
 
-The signature component is one continuous procedural Canvas factory. A single route connects Index Layout Bay, Query Airlock, SSD Node Lift, PQ Scoring Hall, Loop & Re-rank Hall, 4 KB Packing Hall, and Evidence & Limits. Each station contains adjacent cobalt DiskANN and mint AiSAQ machinery, while two signal-yellow pods with method-colored outlines represent the same logical query under the two layouts. Method views dim the nonselected machinery instead of changing topology or moving it to another scene.
-
-Machines are composed from Canvas primitives: cuboids, rotors, drawers, packets, scanners, block trays, read beams, status plates, and query pods. The camera begins fitted to the factory, eases toward the active station when Follow is enabled, accounts for the visible inspector width, and returns to the whole floor through the Fit control. Pointer drag pans the floor and modifier-wheel input zooms it; either manual action disables Follow, while Fit remains durable until Follow is explicitly restored. Station labels are picked directly from the Canvas for stage jumps and declutter below the minimum useful zoom.
-
-### Right Inspector and Checkpoint
-
-On desktop, the inspector overlays the right edge from below the header to above the dock. It pairs a condensed station headline and source metadata with an action card whose four rows always explain the common action, DiskANN, AiSAQ, and why they differ. The action list and seven-stop route support direct jumps. At the end of each 14–18 second stage, autoplay pauses at a warm-yellow checkpoint; revealing the answer does not advance the route, and Continue moves to the next station. On mobile, this same inspector becomes a bottom sheet with a persistent Details handle; its action comparison remains available while long stage prose, checkpoints, and route controls are removed from the compact view.
-
-### Bottom Control Dock
-
-The dock overlays the bottom of the factory and contains the query plate, Run query, play/pause, next, restart, overall progress, method view, dataset, speed, Follow, and Labels controls. When the inspector is hidden, the dock expands to the right edge. Mobile reduces it to the query plate, Run query, three transport controls, and progress so the factory and explanation sheet retain usable height.
-
-### Progress and Motion
-
-One simulation state drives the current station and action, paired machine phase, query position, camera target, guide copy, HUD, inspector dwell bar, and overall dock progress. While playback runs, ambient motion keeps the route dashes, beacons, background lights, and idle rotors alive; semantic motion uses the active phase to move SSD packets, PQ packets, candidate tokens, scanners, block packers, and evidence shutters. Pause freezes both ambient and semantic Canvas time so the factory becomes a stable inspection frame.
-
-With reduced motion enabled, autoplay begins paused, ambient Canvas time is frozen, camera changes snap to their targets, smooth checkpoint scrolling is removed, and CSS animation/transition durations collapse to 0.001ms. Play, pause, phase stepping, direct station jumps, zoom, Fit, Follow, and Labels remain available.
+The block lab, evidence bars/table, tradeoff balance, recall form, and source ledger retain high-contrast paper fields and explicit measured/derived/illustrative labels.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** preserve one semantic color mapping across Canvas objects, controls, charts, feedback, and prose.
-- **Do** keep DiskANN and AiSAQ adjacent at every station and synchronized to the same route, station, and action.
-- **Do** use condensed display type for landmarks, body type for explanations, and mono type for data.
-- **Do** label illustrative geometry and keep measured evidence visually distinct from derived or simplified material.
-- **Do** preserve visible focus, semantic fallback text, keyboard operation, mobile touch targets, and reduced-motion behavior.
-- **Do** use ambient motion to keep the factory alive and phase-specific motion to explain what is happening now.
-- **Do** keep the Canvas dominant while the overlay header, inspector, ledger, and dock remain readable.
+- **Do** keep the Canvas as the first viewport’s primary explanation.
+- **Do** keep `q`, centroids, and LUT state host-side.
+- **Do** show logical aligned requests down and 4 KiB read units up into reusable scratch for the modeled cache miss.
+- **Do** show DiskANN gathering global DRAM PQ codes and AiSAQ consuming inline PQ codes from its returned chunk.
+- **Do** label `L` as `ID + scalar PQ distance + expansion state`, keep seen IDs separate, and label implementation exact-score records `ID + scalar exact distance`.
+- **Do** preserve semantic text, visible focus, reduced motion, and 44px mobile controls.
 
 ### Don't:
 
-- **Don't** use Signal Cargo Yellow as an arbitrary decorative accent or assign cobalt, mint, and coral new meanings.
-- **Don't** split the factory into separate image panels or substitute the procedural world with a static generated backdrop.
-- **Don't** let the DiskANN and AiSAQ machines advance to different stations or actions.
-- **Don't** introduce ornamental gradients, glossy bubble cards, photorealistic assets, or copied third-party factory artwork.
-- **Don't** hide source boundaries or style an illustrative animation as if it were benchmark telemetry.
-- **Don't** make motion mandatory, remove learner controls, or let overlay chrome and decorative labels crowd the factory on narrow screens.
+- **Don't** depict PQ bytes migrating between methods at query time.
+- **Don't** send query `q` to SSD or imply the LUT lives in the node chunk.
+- **Don't** use DRAM blue or SSD teal as a method identity.
+- **Don't** invent numeric LBAs, request IDs, latency coordinates, or benchmark results.
+- **Don't** imply cache behavior, production telemetry, physical-device proof, deployment, or benchmark reproduction that was not established.
+- **Don't** let overlays crowd out the byte path or make Research detail the beginner default.

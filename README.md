@@ -1,46 +1,40 @@
-# Vector Search Works: DiskANN vs AiSAQ
+# Byte Transit Observatory: DiskANN vs AiSAQ
 
-Vector Search Works is a dependency-free, interactive explanation of **AiSAQ** from [arXiv:2404.06004v2](https://arxiv.org/abs/2404.06004). It turns the paper's central data-placement idea into a full-screen, seven-station factory: the same query moves through synchronized DiskANN and AiSAQ machines while the interface shows what resides in DRAM, what is read from SSD, and why the layouts differ.
+Byte Transit Observatory is a dependency-free visual explanation of **AiSAQ** based on [arXiv:2404.06004v2](https://arxiv.org/abs/2404.06004). A full-screen Canvas cutaway makes one graph-search hop observable across host state, CPU, DRAM, and SSD while a synchronized text ledger explains the same movement.
 
-The learning approach is inspired by Laurentiu Raducu's article, ["How I use LLMs to learn complex topics"](https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/): build a source-grounded mental model, map abstract concepts to persistent visual objects, and let the learner stop, replay, and inspect the process.
+The experience is designed for two reading depths: beginner copy explains what moves and why; Research detail exposes event IDs, phase-relative timing, evidence status, memory figures, and derived block spans.
 
-## What the site teaches
+## What the trace shows
 
-- Why graph-based approximate nearest-neighbor search uses compressed product-quantization (PQ) vectors while traversing candidates.
-- The DiskANN baseline: compressed vectors used during traversal are kept in memory while full vectors and graph data live on SSD.
-- AiSAQ's central change: the compressed vectors needed to evaluate a node's neighbors are stored with that node's SSD record, reducing the index's DRAM requirement in exchange for larger SSD records and potentially larger node-chunk reads.
-- How a query expands candidates, visits graph nodes, and eventually re-ranks a short list with full vectors.
-- Why the storage layout can make switching among multiple indexes more practical.
+1. Query `q`, PQ centroids, and lookup-table state remain host-side.
+2. On the modeled node-cache miss, an aligned logical read request travels down toward symbolic `LBA(p)`—numeric addresses are not invented.
+3. One or more 4 KiB logical read units return up into reusable DRAM scratch.
+4. DiskANN joins returned neighbor IDs with its dataset-wide PQ array in DRAM. AiSAQ consumes neighbor PQ codes already stored inline in the returned SSD node chunk.
+5. Both run the same PQ-distance role. Candidate list `L` carries `ID + scalar PQ distance + expansion state`, while a separate seen-ID set deduplicates insertions.
+6. During expansion, the current full vector is scored exactly; the implementation’s exact-score ledger retains `ID + scalar exact distance`, then scratch capacity is reused. Paper Algorithm 1’s logical `V` is not the C++ seen-ID set.
 
-Use the play/pause, next-step, restart, speed, follow-camera, label, and comparison controls to inspect the animation at your own pace. The interface also supports keyboard operation, touch layouts, and reduced-motion preferences.
+The two methods remain separate comparison lanes. CPU, DRAM, and SSD colors identify memory tiers across both lanes; they are not method identities.
+
+## Controls
+
+Play or pause, move to the previous or next phase, replay the current phase, scrub within it, restart the full trace, change dataset or speed, switch method view, follow the camera, toggle labels, and reveal Research detail. Keyboard stepping, visible focus, reduced-motion behavior, semantic Canvas fallback text, and a collapsible mobile inspector are included.
 
 ## Run locally
 
-No package install or build step is required. From the repository root, start any static file server. For example:
+No package install or build step is required:
 
 ```sh
 python3 -m http.server 8000
 ```
 
-Then open <http://localhost:8000>. Serving the files over HTTP is recommended instead of opening `index.html` directly so browser module and asset loading behave the same way they do on GitHub Pages.
-
-The production site consists of root `index.html`, `css/`, and `js/` files. Node.js is used only by CI to run `node --check` against every `js/*.js` file before deployment.
+Open <http://localhost:8000>. The site is static HTML, CSS, Canvas, and JavaScript with no backend, tracking, or runtime data fetch.
 
 ## Source and fidelity
 
-The primary technical source is:
+The primary technical source is Kento Tatsuno et al., [“AiSAQ: All-in-Storage ANNS with Product Quantization for DRAM-free Information Retrieval”](https://arxiv.org/pdf/2404.06004v2), arXiv:2404.06004v2.
 
-- Kento Tatsuno, Daisuke Miyashita, Taiga Ikeda, Kiyoshi Ishiyama, Kazunari Sumiyoshi, and Jun Deguchi, ["AiSAQ: All-in-Storage ANNS with Product Quantization for DRAM-free Information Retrieval"](https://arxiv.org/pdf/2404.06004v2), arXiv:2404.06004v2.
+The primary visual model is the full-inline layout evaluated in v2. The animated transport path intentionally shows a cache miss and omits CPU/OS cache internals. It is a teaching trace, not captured production telemetry, a benchmark reproduction, or a literal rendering of the authors’ implementation. Measured values are attributed to paper tables; formulas and block spans are labeled derived; animation-only states are labeled illustrative.
 
-Claims tied to the paper are cited in the interface by section, figure, or table. The factory stations, machines, moving query, timing, block shapes, and small example graph are teaching metaphors—not a benchmark trace or a literal rendering of the implementation. Any values marked as illustrative are not paper results. Consult the paper for the algorithm, experimental setup, qualifications, and exact measurements.
+The interaction approach was informed by Laurentiu Raducu’s learning article and the public `rocket-engine` / `engineworks` examples. This implementation uses independently authored structure, code, artwork, and copy.
 
-The full-screen factory interaction was studied from [LaurentiuGabriel/rocket-engine](https://github.com/LaurentiuGabriel/rocket-engine). That repository does not include a license file, so this project does not copy its code, artwork, logo, or prose; the Canvas factory and AiSAQ process model are independently implemented.
-
-## Deploy with GitHub Pages
-
-1. Create a GitHub repository and push this project to its `main` branch.
-2. In **Settings → Pages**, choose **GitHub Actions** as the source.
-3. Open the **Actions** tab and let **Deploy static site to Pages** finish, or run it manually with **Run workflow**.
-4. Follow the deployment URL shown in the workflow summary. For a project repository, it normally has the form `https://OWNER.github.io/REPOSITORY/`.
-
-The workflow validates all files matching `js/*.js`, assembles `index.html`, `assets/`, `css/`, `js/`, and `.nojekyll` into the Pages artifact, and deploys only after validation succeeds. `.nojekyll` keeps the published tree explicitly static.
+The repository includes a GitHub Pages workflow, but this document does not claim that a deployment has occurred.

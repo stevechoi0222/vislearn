@@ -3,38 +3,38 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#142a37">
-  <meta name="description" content="A full-screen animated factory that compares DiskANN and AiSAQ through one query, from data placement and SSD reads to re-ranking, block cost, evidence, and limits.">
-  <title>Vector Search Works — DiskANN vs AiSAQ</title>
-  <link rel="stylesheet" href="css/styles.css?v=factory-20260810k">
+  <meta name="theme-color" content="#071014">
+  <meta name="description" content="Watch one DiskANN and AiSAQ graph-search hop move through SSD, DRAM, CPU scoring, and the candidate queue—block by block.">
+  <title>Byte Transit Observatory — DiskANN vs AiSAQ</title>
+  <link rel="stylesheet" href="css/styles.css?v=observatory-20260810a">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142a37'/%3E%3Cpath d='M13 18h38v28H13z' fill='%234aaE9b'/%3E%3Cpath d='M18 23h9v8h-9zm0 12h9v6h-9zm13-12h15v8H31zm0 12h15v6H31z' fill='%23f5c84c'/%3E%3C/svg%3E">
 </head>
-<body>
+<body data-detail="beginner">
   <!--
-  THESIS: AiSAQ is a data-placement change, not a new graph; the same query crosses the same graph while PQ codes move from a scale-bound DRAM warehouse into SSD node chunks.
-  OWN-WORLD: A full-screen isometric vector-search factory with cobalt DiskANN machines, mint AiSAQ machines, signal-yellow data cargo, and seven camera stations.
-  STORY: Follow one query hop, compare both layouts, test block packing, inspect paper evidence, and recall the tradeoff.
-  FIRST VIEWPORT: One animated factory fills the screen; a synchronized inspector sits right and an operating console spans the bottom.
-  FORM: A low-poly process tour where one authoritative state drives camera, machines, cargo, HUD, inspector, and controls.
+  THESIS: Make data placement physically inspectable: one graph hop becomes a synchronized byte trace through SSD, transient DRAM, CPU, and an ID-plus-distance queue.
+  OWN-WORLD: A dark systems observatory with a dominant orthographic cutaway, directional trace lanes, paper-white annotations, and fixed colors for SSD, DRAM, CPU work, and payload fields.
+  STORY: Watch the block move, pause at any instant, inspect what survives each boundary, then verify the paper-backed tradeoff below.
+  FIRST VIEWPORT: Canvas owns the viewport; a slim trace ledger overlays left, a collapsible learning inspector sits right, and a scrub-capable transport dock anchors the bottom.
+  FORM: Byte Transit Observatory, selected direction 1; visual-first access trace with beginner-first copy and opt-in research fields.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
-  <a class="skip-link" href="#learning-guide">Skip to the learning guide</a>
+  <a class="skip-link" href="#trace-ledger">Skip to the live trace</a>
 
   <header class="topbar">
     <a class="brand" href="#top" aria-label="Vector Search Works home">
       <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span class="brand-copy"><strong>Vector Search Works</strong><small>DiskANN and AiSAQ, station by station</small></span>
+      <span class="brand-copy"><strong>Byte Transit Observatory</strong><small>One graph hop · every memory boundary</small></span>
     </a>
     <div class="factory-hud" aria-label="Simulation status">
-      <span>LINE <strong id="hud-line">Both</strong></span>
-      <span>STATION <strong id="hud-station">1 / 7</strong></span>
-      <span>ACTION <strong id="hud-action">1 / 4</strong></span>
-      <span>MODE <strong id="hud-query">index inspection</strong></span>
+      <span>VIEW <strong id="hud-line">Both</strong></span>
+      <span>STAGE <strong id="hud-station">1 / 7</strong></span>
+      <span>PHASE <strong id="hud-action">1 / 4</strong></span>
+      <span class="hud-mode">TRACE <strong id="hud-query">index inspection</strong></span>
     </div>
     <nav class="topnav" aria-label="Page sections">
       <a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper</a>
       <a href="#sources">About &amp; accuracy</a>
-      <button class="plain-button" id="panel-toggle" type="button" aria-expanded="true" aria-controls="learning-guide">Hide guide</button>
+      <button class="plain-button" id="panel-toggle" type="button" aria-expanded="true" aria-controls="learning-guide">Hide inspector</button>
     </nav>
     <button class="plain-button top-menu" id="top-menu" type="button" aria-expanded="false" aria-controls="mobile-nav">
       <span class="sr-only">Toggle navigation</span>
@@ -47,13 +47,15 @@
 
   <main id="top">
     <section class="sim-shell" aria-labelledby="sim-heading">
-      <h1 id="sim-heading" class="sr-only">AiSAQ and DiskANN interactive storage-layout comparison</h1>
+      <h1 id="sim-heading" class="sr-only">Byte Transit Observatory: an interactive DiskANN and AiSAQ memory-access trace</h1>
 
       <div class="sim-grid">
         <div class="stage-wrap">
-          <canvas id="yard" aria-hidden="true"></canvas>
+          <canvas id="yard" role="img" aria-label="Animated cutaway of DiskANN and AiSAQ moving one graph-search hop through SSD, DRAM, CPU, and a candidate queue" aria-describedby="canvas-phase-summary">
+            Your browser does not support Canvas. The live text trace below describes the same memory movement.
+          </canvas>
           <div class="canvas-fallback" id="canvas-fallback">
-            <p id="canvas-phase-summary"><strong>Visual summary:</strong> Both systems receive the same query. DiskANN keeps every node's PQ code in DRAM; AiSAQ reads the needed neighbor PQ codes with the current SSD node chunk.</p>
+            <p id="canvas-phase-summary"><strong>Visual summary:</strong> Both methods follow the same graph-search step. DiskANN joins neighbor IDs from SSD with PQ codes resident in DRAM; AiSAQ uses neighbor PQ codes already stored inside the SSD node chunk.</p>
           </div>
 
           <div class="scene-status" aria-hidden="true">
@@ -63,50 +65,71 @@
           </div>
           <p class="sr-only" id="phase-live" role="status" aria-live="polite" aria-atomic="true"></p>
 
-          <div class="camera-controls" aria-label="Factory camera controls">
+          <div class="scope-badge" aria-label="Paper and visualization scope">
+            <strong>arXiv v2 scope</strong>
+            <span>Evaluated full-inline AiSAQ layout</span>
+            <small>Teaching trace assumes a node-cache miss; cache-hit paths are omitted.</small>
+          </div>
+
+          <div class="camera-controls" aria-label="Observatory camera controls">
             <button id="camera-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
             <button id="camera-out" type="button" aria-label="Zoom out" title="Zoom out">−</button>
-            <button id="camera-fit" type="button" aria-label="Show the whole factory" title="Show the whole factory">⤢</button>
+            <button id="camera-fit" type="button" aria-label="Fit the whole observatory" title="Fit the whole observatory">⤢</button>
           </div>
 
           <div class="line-key" aria-hidden="true">
-            <span><i class="diskann-key"></i>DiskANN · global PQ in DRAM</span>
-            <span><i class="aisaq-key"></i>AiSAQ · neighbor PQ inline on SSD</span>
-            <span><i class="query-key"></i>same logical query</span>
+            <span><i class="diskann-key"></i>DRAM · resident or temporary</span>
+            <span><i class="aisaq-key"></i>SSD · stored node chunk</span>
+            <span><i class="query-key"></i>CPU work · active payload</span>
           </div>
 
-          <div class="live-ledger" aria-live="polite" aria-atomic="true">
-            <div class="ledger-item diskann-ledger">
-              <span>DiskANN peak memory</span>
-              <strong id="diskann-memory">31,303 MB</strong>
-              <small id="diskann-codes">1,000,000,000 PQ codes resident</small>
-            </div>
-            <div class="ledger-item aisaq-ledger">
-              <span>AiSAQ peak memory</span>
-              <strong id="aisaq-memory">11 MB</strong>
-              <small id="aisaq-codes">≤ R + n_ep codes · 53 if n_ep = 1</small>
-            </div>
-            <div class="ledger-item io-ledger">
-              <span>Blocks per node chunk</span>
-              <strong id="block-count">1 → 1</strong>
-              <small>DiskANN → AiSAQ · derived</small>
-            </div>
-          </div>
+          <section class="trace-ledger" id="trace-ledger" aria-labelledby="trace-ledger-title" aria-live="polite" aria-atomic="true">
+            <header>
+              <div><span>LIVE ACCESS TRACE</span><strong id="trace-ledger-title">Where the bytes are now</strong></div>
+              <output id="trace-progress" for="trace-scrubber">0%</output>
+            </header>
+            <ol class="trace-lanes">
+              <li class="trace-lane request-lane" id="trace-request-lane" data-status="current">
+                <span class="trace-direction" aria-hidden="true">↓</span>
+                <div><strong id="trace-request-label">Request / address</strong><p id="trace-request-route">Host request queue → logical node-chunk address</p><small id="trace-request-address">Address is symbolic unless supplied by the trace.</small></div>
+              </li>
+              <li class="trace-lane return-lane" id="trace-return-lane" data-status="pending">
+                <span class="trace-direction" aria-hidden="true">↑</span>
+                <div><strong id="trace-return-label">Data return</strong><p id="trace-return-route">SSD block → reusable DRAM scratch</p><small id="trace-return-payload">Full vector + degree + neighbor IDs</small></div>
+              </li>
+              <li class="trace-lane compute-lane" id="trace-compute-lane" data-status="pending">
+                <span class="trace-direction" aria-hidden="true">→</span>
+                <div><strong id="trace-compute-label">Compute / commit</strong><p id="trace-compute-route">CPU lookup-table scoring → host search state</p><small id="trace-candidate-queue">L · ID + scalar PQ distance + expansion flag</small></div>
+              </li>
+            </ol>
+            <dl class="trace-research research-only">
+              <div><dt>Event ID</dt><dd id="trace-event-id">not supplied</dd></div>
+              <div><dt>Window</dt><dd id="trace-event-window">phase-relative</dd></div>
+              <div><dt>Evidence</dt><dd id="trace-fact-status">illustrative trace</dd></div>
+              <div><dt>Exact record</dt><dd id="trace-exact-queue">Node ID + exact scalar distance</dd></div>
+            </dl>
+          </section>
         </div>
 
-        <div class="transport" aria-label="Simulation controls">
+        <div class="transport" aria-label="Simulation trace controls">
           <div class="query-plate">
-            <span>LEARNING RUN</span><strong>PAPER 2404.06004</strong>
+            <span>ACTIVE TRACE</span><strong id="dock-phase-label">PAPER 2404.06004</strong>
           </div>
           <div class="transport-actions">
-            <button class="run-button" id="tour-start" type="button">Run tour</button>
+            <button class="run-button" id="tour-start" type="button">Run trace</button>
+            <button class="control-button" id="previous" type="button" aria-label="Previous phase" title="Previous phase (Left arrow)"><span aria-hidden="true">←</span><span class="control-label">Previous</span></button>
             <button class="control-button primary" id="play" type="button" aria-label="Pause simulation" title="Play or pause (Space)">
               <span id="play-icon" aria-hidden="true">Ⅱ</span><span class="control-label" id="play-label">Pause</span>
             </button>
-            <button class="control-button" id="next" type="button" aria-label="Next action" title="Next stop (Right arrow)"><span aria-hidden="true">↦</span><span class="control-label">Next</span></button>
-            <button class="control-button" id="restart" type="button" aria-label="Restart tour" title="Restart (R)"><span aria-hidden="true">↺</span><span class="control-label">Restart</span></button>
+            <button class="control-button" id="next" type="button" aria-label="Next phase" title="Next phase (Right arrow)"><span aria-hidden="true">→</span><span class="control-label">Next</span></button>
+            <button class="control-button" id="replay-phase" type="button" aria-label="Replay current phase" title="Replay current phase"><span aria-hidden="true">↻</span><span class="control-label">Replay phase</span></button>
+            <button class="control-button restart-control" id="restart" type="button" aria-label="Restart complete trace" title="Restart complete trace (R)"><span aria-hidden="true">↺</span><span class="control-label">Restart all</span></button>
           </div>
-          <div class="tour-progress" aria-label="Tour progress"><i id="tour-progress"></i></div>
+          <label class="scrubber-field" for="trace-scrubber">
+            <span>Phase position <output id="trace-scrubber-value" for="trace-scrubber">0%</output></span>
+            <input id="trace-scrubber" type="range" min="0" max="1000" step="1" value="0" aria-label="Scrub within the current phase">
+          </label>
+          <div class="tour-progress" aria-hidden="true"><i id="tour-progress"></i></div>
           <div class="mode-switch" role="group" aria-label="View mode">
             <button type="button" data-view="split" class="active" aria-pressed="true">Both</button>
             <button type="button" data-view="diskann" aria-pressed="false">DiskANN</button>
@@ -124,11 +147,12 @@
           <div class="transport-toggles">
             <label><input id="follow" type="checkbox" checked><span>Follow query</span></label>
             <label><input id="labels" type="checkbox" checked><span>Labels</span></label>
+            <label><input id="research-mode" type="checkbox"><span>Research detail</span></label>
           </div>
         </div>
 
         <aside class="learning-guide" id="learning-guide" aria-labelledby="stage-title">
-          <button class="guide-handle" id="guide-handle" type="button" aria-expanded="true" aria-controls="guide-body"><span>Details</span><i aria-hidden="true"></i></button>
+          <button class="guide-handle" id="guide-handle" type="button" aria-expanded="true" aria-controls="guide-body"><span>Learning inspector</span><i aria-hidden="true"></i></button>
           <div class="guide-head">
             <div class="stage-meta"><span id="stage-count">Stop 1 of 7</span><span id="stage-source-short">Paper §1</span></div>
             <h2 id="stage-title">The memory wall</h2>
@@ -139,12 +163,19 @@
             <p id="stage-body"></p>
             <a id="stage-source" class="source-link" href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper §1 <span aria-hidden="true">↗</span></a>
 
+            <div class="dataset-metrics research-only" aria-label="Selected dataset research details">
+              <div><span>DiskANN peak memory</span><strong id="diskann-memory">31,303 MB</strong><small id="diskann-codes">1,000,000,000 PQ codes resident</small></div>
+              <div><span>AiSAQ peak memory</span><strong id="aisaq-memory">11 MB</strong><small id="aisaq-codes">≤ R + n_ep codes · 53 if n_ep = 1</small></div>
+              <div><span>Derived block span</span><strong id="block-count">1 → 1</strong><small>DiskANN → AiSAQ</small></div>
+            </div>
+
             <section class="action-explanation" aria-labelledby="action-explanation-title">
               <div class="action-explanation-head">
                 <strong id="action-explanation-title">What is happening now</strong>
                 <span id="guide-action-count">Action 1 of 1</span>
               </div>
               <h3 id="guide-action-label">Follow the same query</h3>
+              <p class="queue-definition"><strong>Search state</strong> keeps <span>L: ID + scalar PQ distance + expansion flag</span>, a separate seen-ID set, and a separate exact-score ledger.</p>
               <dl class="bilateral-rows">
                 <div class="bilateral-row common-row">
                   <dt>Common action</dt>
@@ -310,22 +341,23 @@
           <h3>Primary material</h3>
           <ul>
             <li><a href="https://arxiv.org/abs/2404.06004" target="_blank" rel="noreferrer">AiSAQ paper record <span aria-hidden="true">↗</span></a></li>
-            <li><a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Current v2 PDF <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Scoped v2 PDF <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/kioxia-jp/aisaq-diskann" target="_blank" rel="noreferrer">Authors’ implementation <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://github.com/kioxia-jp/aisaq-diskann/blob/a9898254452c03626a56452735155ccf1909d30c/src/pq_flash_index.cpp#L1463-L1684" target="_blank" rel="noreferrer">Paper-era search hot path <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/" target="_blank" rel="noreferrer">Learning-method reference <span aria-hidden="true">↗</span></a></li>
-            <li><a href="https://github.com/LaurentiuGabriel/rocket-engine" target="_blank" rel="noreferrer">Factory-interaction reference <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://github.com/LaurentiuGabriel/rocket-engine" target="_blank" rel="noreferrer">Canvas-interaction reference <span aria-hidden="true">↗</span></a></li>
           </ul>
         </div>
         <div>
           <h3>Real</h3>
-          <p>Data placement, node-chunk fields, formulas, dataset presets, 4 KB block model, benchmark tables, and stated limitations.</p>
+          <p>Data placement, node-chunk fields, formulas, dataset presets, 4 KiB logical read-unit model, benchmark tables, and stated limitations.</p>
           <h3>Simplified</h3>
-          <p>One query vehicle, a small visible graph, sequential hops, and spatially separated buildings. Real searches batch work and real SSD layouts are not little warehouses.</p>
+          <p>One illustrative candidate read is enlarged. A real beam-search iteration may expand up to <em>w</em> candidates, and cache hits can bypass the SSD path shown here.</p>
         </div>
         <div>
           <h3>Not established by the paper</h3>
           <p>Production tail latency, sustained concurrency, update/delete behavior, failure recovery, billion-scale text retrieval, and total distributed-system cost.</p>
-          <p class="version-note">Explainer reviewed against arXiv v2 · 26 February 2025.</p>
+          <p class="version-note">Scope frozen to arXiv v2 (26 February 2025) · implementation references reviewed 10 August 2026.</p>
         </div>
       </div>
     </section>
@@ -333,14 +365,14 @@
 
   <footer>
     <p>Built to make one systems-paper idea visible.</p>
-    <p><a href="#top">Back to the factory ↑</a></p>
+    <p><a href="#top">Back to the observatory ↑</a></p>
   </footer>
 
-  <script src="js/content.js?v=factory-20260810k"></script>
-  <script src="js/iso.js?v=factory-20260810k"></script>
-  <script src="js/sim.js?v=factory-20260810k"></script>
-  <script src="js/render.js?v=factory-20260810k"></script>
-  <script src="js/ui.js?v=factory-20260810k"></script>
-  <script src="js/main.js?v=factory-20260810k"></script>
+  <script src="js/content.js?v=observatory-20260810a"></script>
+  <script src="js/iso.js?v=observatory-20260810a"></script>
+  <script src="js/sim.js?v=observatory-20260810a"></script>
+  <script src="js/render.js?v=observatory-20260810a"></script>
+  <script src="js/ui.js?v=observatory-20260810a"></script>
+  <script src="js/main.js?v=observatory-20260810a"></script>
 </body>
 </html>

@@ -1,64 +1,59 @@
 ---
-title: DiskANN and AiSAQ animated factory design QA
+title: Byte Transit Observatory implementation QA
 date: 2026-08-10
-final result: passed
+status: implementation pass; release and physical-device verification pending
 ---
 
-# DiskANN and AiSAQ animated factory design QA
+# Byte Transit Observatory implementation QA
 
-## Comparison input
+This record covers the current local implementation. It is not deployment proof, production telemetry, a benchmark reproduction, or physical-device certification.
 
-- Behavior and composition reference: `tmp/qa/rocket-reference/source-desktop-top.png` (1536 × 1024)
-- Release-candidate desktop capture: `tmp/qa/factory-redesign/final-desktop-k.png` (1521 × 1014 browser pixels from a 1536 × 1024 viewport)
-- Padded desktop comparison input: `tmp/qa/factory-redesign/final-desktop-k-padded.png` (1536 × 1024)
-- Combined reference and implementation: `tmp/qa/factory-redesign/source-vs-final-desktop-k.png` (3072 × 1024)
-- Mobile expanded, checkpoint, and collapsed captures: `tmp/qa/factory-redesign/final-mobile-expanded-j.png`, `final-mobile-checkpoint-j.png`, and `final-mobile-collapsed-j.png` (375 × 812 browser pixels from a 390 × 844 viewport)
-- Intermediate-width capture: `tmp/qa/factory-redesign/final-tablet-corrected.png` (885 × 787 browser pixels from a 900 × 800 viewport)
+## Implemented composition
 
-The combined image was reviewed as one comparison input. The implementation matches the reference's full-screen isometric factory, top HUD, right inspector, bottom transport, camera controls, active-station focus, and synchronized single-state behavior. Its geometry and artwork are independently drawn for the DiskANN/AiSAQ subject; no source code, image, text, or asset from the reference repository is included because that repository exposes no license file.
+- Canvas is the dominant first-viewport surface.
+- The upper-left semantic ledger exposes Request/Address, Data Return, and Compute/Commit state from `traceSnapshot()`.
+- The right learning inspector is narrower than the previous guide and collapses to a 44px peek at 760px and below.
+- The bottom dock includes Previous, Play/Pause, Next, Replay Phase, stage-local scrub, Research detail, overall progress, and responsive secondary controls.
+- Beginner text is the default. Research fields expose event ID, phase-relative window, evidence status, memory figures, and derived block span only when enabled.
+- The paper-scope badge identifies arXiv v2’s evaluated full-inline layout and the cache-miss/caches-omitted teaching boundary.
+- Block lab, evidence, tradeoff, quiz, and source sections remain below the first viewport with their existing semantic IDs.
 
-## Core experience
+## Trace-fidelity review
 
-- The primary visual is a procedural Canvas factory, not a bitmap backdrop or image overlay.
-- Seven camera stations cover index layout, query entry, SSD node reads, PQ scoring, loop and re-ranking, 4 KB block derivation, and evidence or limits.
-- All 27 actions have a distinct machine state. The release sweep found 27 unique stage/action/label combinations.
-- Common action, DiskANN, AiSAQ, and Why it differs remain non-empty and visible at every action.
-- The HUD separates `index inspection`, `query run`, `derivation`, and `evidence`; query carriers stop before the derivation and evidence stations.
-- Camera follow, zoom, fit, pointer drag, modifier-wheel zoom, station selection, view mode, dataset, speed, labels, pause, next, restart, and checkpoint continuation are operational. Ordinary wheel gestures remain available for scrolling to the learning sections below the factory.
+- Query `q`, centroids, and query-to-centroid LUT state remain host-side.
+- The modeled node-cache miss sends an aligned logical request down toward symbolic `LBA(p)`; no numeric LBA or request identifier is invented.
+- One or more 4 KiB logical read units return up into reusable DRAM scratch.
+- DiskANN joins SSD-returned neighbor IDs to its dataset-wide DRAM PQ array.
+- AiSAQ consumes neighbor PQ codes already stored in the returned full-inline SSD node chunk.
+- Candidate list `L` retains `ID + scalar PQ distance + expansion state`; a separate seen-ID set handles deduplication.
+- Exact distance is computed during expansion from the current full vector; the implementation’s exact-score ledger retains `ID + scalar exact distance`, then scratch capacity is reused. Paper `V` is not conflated with the C++ seen-ID set.
+- Method identity uses fixed lane, label, and marker. CPU/DRAM/SSD colors keep the same tier meaning across both methods.
 
-## Motion and state integrity
+## Accessibility and responsive review
 
-- One simulation state drives the camera target, active station, machine phase, progress bars, HUD, guide, action list, route, and controls.
-- Pause freezes semantic and ambient factory motion. Two Canvas captures taken 1.6 seconds apart while paused were byte-identical (`e42f353b…` for both), while progress remained unchanged.
-- Checkpoint and Continue keep the document at `scrollY = 0`; only the inspector's internal scroll position changes.
-- Manual camera movement disables Follow, and Fit remains selected through subsequent actions until Follow is explicitly restored.
-- Reduced-motion users start paused, camera transitions snap, ambient animation is frozen, and action stepping remains available.
+- Canvas has a semantic label, synchronized fallback summary, and polite phase live region.
+- Scrubbing uses a native keyboard-operable range input with updated value text.
+- Reduced-motion mode starts paused and collapses CSS transition durations.
+- Mobile primary controls, inspector handle, and camera controls use 44px targets.
+- Collapsed inspector content is inert.
+- Global CSS prevents horizontal document scrolling; lower learning sections stack at the mobile breakpoint.
 
-## Responsive and accessibility checks
+## Local checks completed
 
-- At 1536 × 1024, 900 × 800, and 390 × 844 there is no horizontal overflow.
-- The 900px guide retains all four comparison rows; the earlier hidden progress-row grid collapse is corrected.
-- Mobile keeps a full-height Canvas with a scrollable bottom sheet. The sheet can collapse to reveal the complete factory.
-- Stage checkpoints remain visible and actionable on mobile; the tested Reveal button stayed inside the expanded sheet.
-- Collapsed guide content is inert and visually hidden.
-- The Canvas has an updated semantic phase summary, while the visual Canvas itself is excluded from the accessibility tree.
-- Phase transitions use a polite live region, checkpoints receive focus without moving the document, and Next and Restart have explicit accessible names.
-- The release browser console reported zero warnings and zero errors.
+- `node --check` passed for every `js/*.js` file after the Observatory integration.
+- DOM audit found 119 IDs, zero duplicates, and no missing static `ui.js` ID references.
+- `git diff --check` passed.
+- The Impeccable detector’s structural warning was removed; remaining findings are advisory tonal and compact instrument-type variants documented by the Observatory visual system.
+- Headless render captures were generated and visually reviewed at 1440 × 900 and 390 × 844. The desktop composition showed the complete Canvas, ledger, scope badge, inspector, and dock. The mobile composition activated the compact trace, collapsed inspector peek, compact dock, and mobile Canvas framing.
 
-## Paper-fidelity checks
+## Still pending
 
-- The graph topology and search rule stay matched; the visual changes data placement, not the Vamana topology or PQ-distance rule.
-- No runtime migration is shown. AiSAQ neighbor PQ codes are visibly prebuilt into SSD node chunks.
-- Stage 1 distinguishes pre-query `n_ep` state from the hop-local `R + n_ep` bound.
-- Full vectors enter `V` before full-distance sorting, and returned packets are labeled as an illustrative three of top-k.
-- Chunk formulas include the outdegree field: `B_D = b_full + b_num(R + 1)` and `B_A = B_D + R·b_PQ`.
-- SIFT1M, SIFT1B, and KILT block values are labeled derived from Table 1 inputs and a 4 KB teaching model.
-- Evidence bars are explicitly schematic while exact memory and load values are labeled measured from Tables 2 and 3.
-- The 1.9 ms centroid reload and 0.3 ms shared-centroid plus 4 KB metadata paths are shown separately.
-- Filtering and dynamic indexing are scoped to the evaluated build, and 11–14 MB is never presented as zero RAM.
+- Full keyboard interaction sweep across every phase and checkpoint.
+- Screen-reader verification in a real assistive-technology session.
+- Physical phone/touch verification and safe-area testing.
+- Production URL, deployment, and live-network verification.
+- Independent performance or benchmark reproduction.
 
-## Finish review
+## Verdict
 
-The interface detector's actionable side-tab warnings were removed by replacing thick inset stripes with borders or outlines. Remaining literal-color and scale advisories are intentional tonal shading inside the documented factory palette, not untracked component variants. Syntax checks, phase-state assertions, reduced-motion stepping, the 27-action browser sweep, breakpoint captures, pause hashes, checkpoint scroll checks, manual-camera checks, and source-versus-final visual comparison all passed.
-
-final result: passed
+The implemented Observatory direction is documented and locally render-reviewed. Release-readiness claims remain pending the checks above.

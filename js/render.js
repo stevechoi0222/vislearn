@@ -21,6 +21,14 @@
     steel: "#7d8583",
     steelDark: "#454c4a",
     asphalt: "#242826",
+    observatory: "#071014",
+    observatory2: "#0b171c",
+    ssd: "#35c8b0",
+    dram: "#5a82ef",
+    cpu: "#f5c84c",
+    full: "#ec7c68",
+    ids: "#d8e1de",
+    pq: "#f5c84c",
   });
 
   const FLOOR = Object.freeze({ width: 28, depth: 19 });
@@ -75,7 +83,7 @@
     let panelVisible = true;
     let labelsEnabled = true;
     let reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let camera = { x: 14, y: 9.5, zoom: .64 };
+    let camera = { x: 0, y: 0, zoom: 1 };
     let cameraMode = "follow";
     let manualTarget = { ...camera };
     let zoomNudge = 0;
@@ -101,24 +109,12 @@
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
 
-    function fitZoom() {
-      const guide = panelVisible && logicalWidth > 760 ? Math.min(430, logicalWidth * .27) + 50 : 28;
-      const usableWidth = Math.max(280, logicalWidth - guide);
-      const usableHeight = logicalWidth <= 760 ? logicalHeight * .71 : logicalHeight * .84;
-      return clamp(Math.min(usableWidth / 1170, usableHeight / 690), .29, .86);
-    }
+    function fitZoom() { return 1; }
 
     function cameraTarget(state, context) {
-      const station = STATIONS[state.stageIndex] || STATIONS[0];
-      const stageOpening = state.stageIndex === 0 ? smooth(clamp(state.elapsed / 3.2, 0, 1)) : 1;
-      const followZoom = logicalWidth <= 760 ? .9 : logicalWidth <= 1100 ? 1.02 : 1.18;
       if (cameraMode === "manual") return manualTarget;
-      if (cameraMode === "fit" || !state.follow) return { x: 14, y: 9.5, zoom: fitZoom() + zoomNudge };
-      return {
-        x: lerp(14, station.x, stageOpening),
-        y: lerp(9.5, station.y, stageOpening),
-        zoom: lerp(fitZoom(), followZoom + zoomNudge, stageOpening),
-      };
+      if (cameraMode === "fit" || !state.follow) return { x: 0, y: 0, zoom: fitZoom() + zoomNudge };
+      return { x: 0, y: 0, zoom: 1 + zoomNudge };
     }
 
     function updateCamera(state, context, now) {
@@ -745,43 +741,742 @@
       drawStatusPlate({ x: point.x, y: logicalHeight - (logicalWidth <= 760 ? 118 : 108) }, "SAME GRAPH · SAME PQ MATH · SAME L/V RULES · SAME RE-RANK", COLORS.yellow);
     }
 
+    /* ------------------------------------------------ Byte Transit Observatory
+       This renderer is deliberately orthographic. The subject is not a factory
+       process any more; it is a byte path whose source, temporary residence and
+       surviving scalar state must remain visible while the learner scrubs time. */
+
+    const OBS_FONT = '"Avenir Next", "Segoe UI", Helvetica, Arial, sans-serif';
+    const OBS_DATA = '"SFMono-Regular", Consolas, "Liberation Mono", monospace';
+    const PACKING = Object.freeze({
+      SIFT1M: { full: 512, meta: 228, pq: 7168 },
+      SIFT1B: { full: 128, meta: 212, pq: 1664 },
+      "KILT E5 22M": { full: 4096, meta: 280, pq: 8832 },
+    });
+
+    function obsRectPath(x, y, width, height, radius) {
+      const r = Math.min(Math.max(0, radius || 0), width / 2, height / 2);
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.lineTo(x + width - r, y);
+      ctx.quadraticCurveTo(x + width, y, x + width, y + r);
+      ctx.lineTo(x + width, y + height - r);
+      ctx.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
+      ctx.lineTo(x + r, y + height);
+      ctx.quadraticCurveTo(x, y + height, x, y + height - r);
+      ctx.lineTo(x, y + r);
+      ctx.quadraticCurveTo(x, y, x + r, y);
+      ctx.closePath();
+    }
+
+    function obsBox(x, y, width, height, options) {
+      const o = options || {};
+      ctx.save();
+      if (o.shadow) {
+        ctx.fillStyle = o.shadowColor || "rgba(0,0,0,.26)";
+        obsRectPath(x + 6, y + 8, width, height, o.radius || 6);
+        ctx.fill();
+      }
+      ctx.fillStyle = o.fill || COLORS.observatory2;
+      obsRectPath(x, y, width, height, o.radius || 6);
+      ctx.fill();
+      if (o.stroke !== false) {
+        ctx.strokeStyle = o.stroke || "#34505a";
+        ctx.lineWidth = o.lineWidth || 1;
+        ctx.stroke();
+      }
+      if (o.accent) {
+        ctx.fillStyle = o.accent;
+        ctx.fillRect(x, y, width, Math.max(2, o.accentWidth || 3));
+      }
+      ctx.restore();
+    }
+
+    function obsText(text, x, y, options) {
+      const o = options || {};
+      ctx.save();
+      ctx.fillStyle = o.color || "#dce8e5";
+      ctx.font = `${o.weight || 700} ${o.size || 11}px ${o.data ? OBS_DATA : OBS_FONT}`;
+      ctx.textAlign = o.align || "left";
+      ctx.textBaseline = o.baseline || "alphabetic";
+      if (o.maxWidth) ctx.fillText(String(text), x, y, o.maxWidth);
+      else ctx.fillText(String(text), x, y);
+      ctx.restore();
+    }
+
+    function obsRule(x1, y1, x2, y2, color, width, dash) {
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = width || 1;
+      if (dash) ctx.setLineDash(dash);
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    function obsArrow(from, to, options) {
+      const o = options || {};
+      const color = o.color || COLORS.cpu;
+      const width = o.width || 2;
+      const alpha = Number.isFinite(o.alpha) ? o.alpha : 1;
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.max(1, Math.hypot(dx, dy));
+      const ux = dx / length;
+      const uy = dy / length;
+      const head = Math.max(7, width * 3.2);
+      ctx.save();
+      ctx.globalAlpha *= alpha;
+      ctx.strokeStyle = color;
+      ctx.fillStyle = color;
+      ctx.lineWidth = width;
+      ctx.lineCap = "round";
+      if (o.dash) ctx.setLineDash(o.dash);
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x - ux * head * .6, to.y - uy * head * .6);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath();
+      ctx.moveTo(to.x, to.y);
+      ctx.lineTo(to.x - ux * head - uy * head * .52, to.y - uy * head + ux * head * .52);
+      ctx.lineTo(to.x - ux * head + uy * head * .52, to.y - uy * head - ux * head * .52);
+      ctx.closePath();
+      ctx.fill();
+      if (Number.isFinite(o.progress)) {
+        const t = smooth(clamp(o.progress, 0, 1));
+        const px = lerp(from.x, to.x, t);
+        const py = lerp(from.y, to.y, t);
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 10;
+        ctx.beginPath();
+        ctx.arc(px, py, Math.max(3.5, width * 1.8), 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
+    function obsSceneRect() {
+      const mobile = logicalWidth <= 760;
+      const compact = logicalWidth <= 1180 && !mobile;
+      const left = mobile ? 8 : compact ? Math.min(238, logicalWidth * .23) : Math.min(336, logicalWidth * .255);
+      const right = mobile ? 8 : panelVisible ? (compact ? Math.min(248, logicalWidth * .24) : Math.min(372, logicalWidth * .265)) : 24;
+      const top = mobile ? 226 : 94;
+      const bottom = mobile ? logicalHeight - 202 : logicalHeight - 136;
+      return {
+        x: left,
+        y: top,
+        width: Math.max(280, logicalWidth - left - right),
+        height: Math.max(300, bottom - top),
+        mobile,
+      };
+    }
+
+    function obsBackground(scene) {
+      const gradient = ctx.createLinearGradient(0, 0, 0, logicalHeight);
+      gradient.addColorStop(0, "#091419");
+      gradient.addColorStop(.62, COLORS.observatory);
+      gradient.addColorStop(1, "#040a0d");
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, logicalWidth, logicalHeight);
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(scene.x, scene.y, scene.width, scene.height);
+      ctx.clip();
+      ctx.strokeStyle = "rgba(103,139,151,.08)";
+      ctx.lineWidth = 1;
+      const grid = scene.mobile ? 28 : 34;
+      for (let x = scene.x - (scene.x % grid); x < scene.x + scene.width; x += grid) {
+        ctx.beginPath(); ctx.moveTo(x, scene.y); ctx.lineTo(x, scene.y + scene.height); ctx.stroke();
+      }
+      for (let y = scene.y - (scene.y % grid); y < scene.y + scene.height; y += grid) {
+        ctx.beginPath(); ctx.moveTo(scene.x, y); ctx.lineTo(scene.x + scene.width, y); ctx.stroke();
+      }
+      ctx.restore();
+      obsRule(scene.x, scene.y, scene.x + scene.width, scene.y, "rgba(128,165,176,.34)", 1);
+      obsRule(scene.x, scene.y + scene.height, scene.x + scene.width, scene.y + scene.height, "rgba(128,165,176,.22)", 1);
+    }
+
+    function obsWorldTransform(scene) {
+      const cx = scene.x + scene.width / 2;
+      const cy = scene.y + scene.height / 2;
+      ctx.translate(cx + camera.x * 18, cy + camera.y * 18);
+      ctx.scale(camera.zoom, camera.zoom);
+      ctx.translate(-cx, -cy);
+    }
+
+    function obsLayout(scene) {
+      const rail = scene.mobile ? 22 : 26;
+      const common = scene.mobile ? 38 : 44;
+      const gap = scene.mobile ? 8 : 11;
+      const innerTop = scene.y + rail + gap;
+      const commonY = innerTop;
+      const lanesY = commonY + common + gap;
+      const lanesHeight = scene.height - rail - common - gap * 3;
+      const hostH = Math.max(66, lanesHeight * .245);
+      const dramH = Math.max(78, lanesHeight * .285);
+      const ssdH = Math.max(88, lanesHeight - hostH - dramH - gap * 2);
+      const methodGap = scene.mobile ? 8 : 18;
+      const laneWidth = (scene.width - methodGap) / 2;
+      return {
+        railY: scene.y,
+        common: { x: scene.x, y: commonY, width: scene.width, height: common },
+        diskann: {
+          x: scene.x, width: laneWidth,
+          host: { x: scene.x, y: lanesY, width: laneWidth, height: hostH },
+          dram: { x: scene.x, y: lanesY + hostH + gap, width: laneWidth, height: dramH },
+          ssd: { x: scene.x, y: lanesY + hostH + dramH + gap * 2, width: laneWidth, height: ssdH },
+        },
+        aisaq: {
+          x: scene.x + laneWidth + methodGap, width: laneWidth,
+          host: { x: scene.x + laneWidth + methodGap, y: lanesY, width: laneWidth, height: hostH },
+          dram: { x: scene.x + laneWidth + methodGap, y: lanesY + hostH + gap, width: laneWidth, height: dramH },
+          ssd: { x: scene.x + laneWidth + methodGap, y: lanesY + hostH + dramH + gap * 2, width: laneWidth, height: ssdH },
+        },
+        gap,
+      };
+    }
+
+    function obsStageRail(scene, state, context) {
+      const y = scene.y + 11;
+      const left = scene.x + 4;
+      const width = scene.width - 8;
+      const cell = width / STATIONS.length;
+      stationScreens = [];
+      STATIONS.forEach((station, index) => {
+        const x = left + index * cell;
+        const active = index === state.stageIndex;
+        ctx.fillStyle = active ? COLORS.cpu : "rgba(86,116,126,.25)";
+        ctx.fillRect(x + 2, y, Math.max(2, cell - 4), active ? 4 : 2);
+        const cx = x + cell / 2;
+        stationScreens.push({ index, point: { x: cx, y: y + 5 } });
+        if (labelsEnabled && (!scene.mobile || active)) {
+          obsText(active ? `${index + 1} · ${station.short}` : String(index + 1), cx, y + 17, {
+            size: active ? 8.5 : 7,
+            data: true,
+            color: active ? COLORS.cpu : "#718b94",
+            align: "center",
+            weight: 800,
+            maxWidth: Math.max(16, cell - 5),
+          });
+        }
+      });
+      const label = context?.trace?.stateLabel || context?.trace?.scene?.stateLabel || context?.phase?.label || "TRACE";
+      if (!scene.mobile && labelsEnabled) {
+        obsText(label, scene.x + scene.width, y + 18, { size: 8, data: true, align: "right", color: "#9eb1b7", maxWidth: scene.width * .45 });
+      }
+    }
+
+    function obsCommonHost(box, state, context) {
+      obsBox(box.x, box.y, box.width, box.height, { fill: "rgba(11,25,31,.95)", stroke: "#38525c", accent: COLORS.cpu, radius: 4 });
+      const small = box.height < 42;
+      const qx = box.x + box.width * .18;
+      const lutx = box.x + box.width * .55;
+      const cy = box.y + box.height * .58;
+      ctx.save();
+      ctx.fillStyle = COLORS.cpu;
+      ctx.strokeStyle = "#fff0a2";
+      ctx.lineWidth = 2;
+      const radius = small ? 7 : 9;
+      ctx.beginPath();
+      ctx.arc(qx, cy, radius, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+      ctx.restore();
+      obsText("q", qx, cy + 3, { size: small ? 8 : 10, data: true, color: COLORS.observatory, align: "center", weight: 900 });
+      obsText("QUERY PINNED IN HOST", qx + radius + 7, cy + 3, { size: small ? 6.5 : 8, data: true, color: "#d7e1df", weight: 800, maxWidth: box.width * .27 });
+
+      const lutW = box.width * .25;
+      obsBox(lutx - lutW / 2, cy - (small ? 8 : 10), lutW, small ? 16 : 20, { fill: "#392f14", stroke: "#8f7627", radius: 3 });
+      obsText("CENTROIDS + q→LUT", lutx, cy + 3, { size: small ? 6.5 : 8, data: true, color: COLORS.cpu, align: "center", weight: 800, maxWidth: lutW - 8 });
+      obsArrow({ x: qx + box.width * .15, y: cy }, { x: lutx - lutW / 2 - 5, y: cy }, { color: COLORS.cpu, width: 1.5, alpha: .62, dash: [4, 4] });
+
+      const scope = box.x + box.width * .87;
+      obsText("q DOES NOT DESCEND", scope, cy - 1, { size: small ? 6 : 7.5, data: true, color: "#aebfc3", align: "center", weight: 800, maxWidth: box.width * .22 });
+      obsText("cache-miss trace", scope, cy + (small ? 8 : 11), { size: small ? 5.5 : 6.5, data: true, color: "#6f8991", align: "center" });
+    }
+
+    function obsLaneHeader(lane, method, state, scene) {
+      const dimmed = state.view !== "split" && state.view !== method;
+      const marker = method === "diskann" ? "■" : "◆";
+      const title = method === "diskann" ? "DISKANN" : "AISAQ";
+      const detail = method === "diskann" ? "GLOBAL PQ ARRAY" : "FULL-INLINE NODE CHUNK";
+      obsText(`${marker} ${title}`, lane.x + 8, lane.host.y - 7, { size: scene.mobile ? 8 : 10, data: true, color: dimmed ? "#5f737a" : "#ecf2ef", weight: 900 });
+      obsText(detail, lane.x + lane.width - 7, lane.host.y - 7, { size: scene.mobile ? 5.5 : 7, data: true, color: dimmed ? "#53666d" : "#7f969e", align: "right", maxWidth: lane.width * .55 });
+      obsRule(lane.x, lane.host.y - 2, lane.x + lane.width, lane.host.y - 2, dimmed ? "#273a41" : "#9aacb1", 1.2, method === "aisaq" ? [7, 5] : null);
+    }
+
+    function obsTierBox(box, title, accent, scene) {
+      obsBox(box.x, box.y, box.width, box.height, { fill: "rgba(11,26,32,.96)", stroke: "#314b54", accent, radius: 4 });
+      obsText(title, box.x + 8, box.y + (scene.mobile ? 11 : 14), { size: scene.mobile ? 6.5 : 8, data: true, color: accent, weight: 900, maxWidth: box.width - 16 });
+    }
+
+    function obsQueue(host, scene, exact) {
+      const pad = scene.mobile ? 6 : 8;
+      const y = host.y + host.height * .52;
+      const h = Math.max(22, host.height * .34);
+      const rowX = host.x + pad;
+      const rowW = host.width - pad * 2;
+      const gap = scene.mobile ? 2 : 4;
+      const candidateW = rowW * .48;
+      const seenW = rowW * .19;
+      const exactW = rowW - candidateW - seenW - gap * 2;
+      const cells = {
+        candidate: { x: rowX, width: candidateW },
+        seen: { x: rowX + candidateW + gap, width: seenW },
+        exact: { x: rowX + candidateW + seenW + gap * 2, width: exactW },
+      };
+      obsBox(cells.candidate.x, y, cells.candidate.width, h, { fill: "#0c191e", stroke: exact ? "#405862" : "#9a7c24", radius: 3 });
+      obsBox(cells.seen.x, y, cells.seen.width, h, { fill: "#0c191e", stroke: "#405862", radius: 3 });
+      obsBox(cells.exact.x, y, cells.exact.width, h, { fill: exact ? "#3e211d" : "#0c191e", stroke: exact ? COLORS.full : "#405862", radius: 3 });
+      const titleSize = scene.mobile ? 4.5 : 6.2;
+      const valueSize = scene.mobile ? 4.3 : 6.4;
+      obsText("L · CANDIDATES", cells.candidate.x + 4, y + (scene.mobile ? 8 : 10), { size: titleSize, data: true, color: "#aebfc3", weight: 900, maxWidth: cells.candidate.width - 8 });
+      obsText("ID + d_PQ + flag", cells.candidate.x + cells.candidate.width - 4, y + h - (scene.mobile ? 5 : 7), { size: valueSize, data: true, color: COLORS.cpu, align: "right", weight: 800, maxWidth: cells.candidate.width - 8 });
+      obsText("SEEN", cells.seen.x + cells.seen.width / 2, y + (scene.mobile ? 8 : 10), { size: titleSize, data: true, color: "#aebfc3", align: "center", weight: 900, maxWidth: cells.seen.width - 4 });
+      obsText("IDs", cells.seen.x + cells.seen.width / 2, y + h - (scene.mobile ? 5 : 7), { size: valueSize, data: true, color: COLORS.ids, align: "center", weight: 800, maxWidth: cells.seen.width - 4 });
+      obsText("EXACT", cells.exact.x + cells.exact.width / 2, y + (scene.mobile ? 8 : 10), { size: titleSize, data: true, color: exact ? "#ffc0b4" : "#71868c", align: "center", weight: 900, maxWidth: cells.exact.width - 4 });
+      obsText("ID + d_full", cells.exact.x + cells.exact.width / 2, y + h - (scene.mobile ? 5 : 7), { size: valueSize, data: true, color: exact ? "#f0a394" : "#71868c", align: "center", weight: 800, maxWidth: cells.exact.width - 4 });
+      return {
+        candidate: { x: cells.candidate.x + cells.candidate.width / 2, y: y + h / 2 },
+        seen: { x: cells.seen.x + cells.seen.width / 2, y: y + h / 2 },
+        exact: { x: cells.exact.x + cells.exact.width / 2, y: y + h / 2 },
+      };
+    }
+
+    function obsScratch(dram, method, scene, phaseId) {
+      const pad = scene.mobile ? 6 : 8;
+      const bankW = method === "diskann" ? dram.width * .42 : dram.width * .24;
+      const scratchX = dram.x + bankW + pad * 2;
+      const scratchW = dram.width - bankW - pad * 3;
+      const y = dram.y + (scene.mobile ? 17 : 21);
+      const h = dram.height - (scene.mobile ? 23 : 29);
+      obsBox(dram.x + pad, y, bankW, h, { fill: method === "diskann" ? "#172a61" : "#132b38", stroke: method === "diskann" ? "#5878da" : "#3d6471", radius: 3 });
+      obsText(method === "diskann" ? "GLOBAL PQ" : "n_ep", dram.x + pad + bankW / 2, y + 12, { size: scene.mobile ? 5.5 : 7, data: true, color: method === "diskann" ? "#a9bdff" : "#9fb8bf", align: "center", weight: 900, maxWidth: bankW - 6 });
+      if (method === "diskann") {
+        const rows = scene.mobile ? 3 : 5;
+        for (let index = 0; index < rows; index += 1) {
+          ctx.fillStyle = index % 2 ? "#496bd0" : "#3156bc";
+          ctx.fillRect(dram.x + pad + 5, y + 19 + index * ((h - 25) / rows), bankW - 10, Math.max(2, (h - 30) / rows - 2));
+        }
+      } else {
+        ctx.fillStyle = COLORS.pq;
+        ctx.fillRect(dram.x + pad + bankW * .3, y + 22, bankW * .4, Math.max(4, h - 30));
+      }
+      const released = phaseId === "release-hop-payload";
+      obsBox(scratchX, y, scratchW, h, { fill: released ? "rgba(18,38,46,.35)" : "#102a42", stroke: released ? "#526970" : COLORS.dram, radius: 3 });
+      obsText("4 KiB-ALIGNED SCRATCH", scratchX + scratchW / 2, y + 12, { size: scene.mobile ? 5 : 6.8, data: true, color: released ? "#768b91" : "#a9bdff", align: "center", weight: 900, maxWidth: scratchW - 8 });
+      if (released) {
+        obsText("REUSABLE · SSD COPY INTACT", scratchX + scratchW / 2, y + h * .64, { size: scene.mobile ? 4.8 : 6.5, data: true, color: "#81969c", align: "center", weight: 800, maxWidth: scratchW - 8 });
+      }
+      return { bank: { x: dram.x + pad, y, width: bankW, height: h }, scratch: { x: scratchX, y, width: scratchW, height: h } };
+    }
+
+    function obsPayloadFields(x, y, width, height, method, dataset, options) {
+      const o = options || {};
+      const data = PACKING[dataset] || PACKING.SIFT1B;
+      const fields = [
+        { key: "FULL", bytes: data.full, color: COLORS.full, text: "#2c1612" },
+        { key: "DEG + IDs", bytes: data.meta, color: COLORS.ids, text: "#1b262a" },
+      ];
+      if (method === "aisaq") fields.push({ key: "NEIGHBOR PQ", bytes: data.pq, color: COLORS.pq, text: "#2b250e" });
+      const total = fields.reduce((sum, field) => sum + field.bytes, 0);
+      let cursor = x;
+      fields.forEach((field, index) => {
+        const raw = width * field.bytes / total;
+        const segmentWidth = index === fields.length - 1 ? x + width - cursor : raw;
+        ctx.fillStyle = field.color;
+        ctx.fillRect(cursor, y, segmentWidth, height);
+        if (segmentWidth > (o.compact ? 30 : 42) && labelsEnabled) {
+          obsText(field.key, cursor + segmentWidth / 2, y + height / 2 + 3, { size: o.compact ? 5.3 : 7, data: true, color: field.text, align: "center", weight: 900, maxWidth: segmentWidth - 5 });
+        }
+        cursor += segmentWidth;
+      });
+      ctx.strokeStyle = "rgba(4,13,16,.72)";
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, width, height);
+    }
+
+    function obsSsdBlocks(ssd, method, dataset, scene) {
+      const stats = BLOCKS[dataset] || BLOCKS.SIFT1B;
+      const data = PACKING[dataset] || PACKING.SIFT1B;
+      const count = stats[method];
+      const pad = scene.mobile ? 6 : 9;
+      const y = ssd.y + (scene.mobile ? 18 : 23);
+      const height = ssd.height - (scene.mobile ? 27 : 34);
+      const gap = scene.mobile ? 3 : 5;
+      const width = (ssd.width - pad * 2 - gap * (count - 1)) / count;
+      const totalBytes = stats.bytes[method === "diskann" ? 0 : 1];
+      const fields = [
+        { key: "FULL", start: 0, end: data.full, color: COLORS.full, text: "#2c1612" },
+        { key: "DEG + IDs", start: data.full, end: data.full + data.meta, color: COLORS.ids, text: "#1b262a" },
+      ];
+      if (method === "aisaq") fields.push({ key: "NEIGHBOR PQ", start: data.full + data.meta, end: totalBytes, color: COLORS.pq, text: "#2b250e" });
+      for (let index = 0; index < count; index += 1) {
+        const x = ssd.x + pad + index * (width + gap);
+        obsBox(x, y, width, height, { fill: "#113e3b", stroke: COLORS.ssd, radius: 2, shadow: !scene.mobile });
+        const blockStart = index * 4096;
+        const blockEnd = blockStart + 4096;
+        const fieldX = x + 3;
+        const fieldY = y + 16;
+        const fieldW = width - 6;
+        const fieldH = height - 19;
+        fields.forEach((field) => {
+          const overlapStart = Math.max(blockStart, field.start);
+          const overlapEnd = Math.min(blockEnd, field.end);
+          if (overlapEnd <= overlapStart) return;
+          const fx = fieldX + (overlapStart - blockStart) / 4096 * fieldW;
+          const fw = (overlapEnd - overlapStart) / 4096 * fieldW;
+          ctx.fillStyle = field.color;
+          ctx.fillRect(fx, fieldY, fw, fieldH);
+          if (fw > (scene.mobile ? 27 : 38) && labelsEnabled) {
+            obsText(field.key, fx + fw / 2, fieldY + fieldH / 2 + 3, { size: scene.mobile ? 4.8 : 6, data: true, color: field.text, align: "center", weight: 900, maxWidth: fw - 4 });
+          }
+        });
+        ctx.strokeStyle = "rgba(217,238,233,.16)";
+        ctx.strokeRect(fieldX, fieldY, fieldW, fieldH);
+        obsText("4 KiB", x + width / 2, y + 11, { size: scene.mobile ? 5 : 6.5, data: true, color: "#91dccc", align: "center", weight: 900 });
+      }
+      return {
+        center: { x: ssd.x + ssd.width / 2, y: y + height / 2 },
+        top: { x: ssd.x + ssd.width / 2, y },
+        count,
+      };
+    }
+
+    function obsCpu(host, scene, exact, phaseId) {
+      obsTierBox(host, "CPU · LOOKUP + DISTANCE", COLORS.cpu, scene);
+      const aluX = host.x + host.width * .16;
+      const aluY = host.y + host.height * .31;
+      const aluW = host.width * .68;
+      const aluH = Math.max(18, host.height * .17);
+      const aluLabel = phaseId === "record-current-vector"
+        ? "EXACT d(q,p)"
+        : phaseId === "advance-search"
+          ? "SELECT NEXT p"
+          : phaseId === "rerank-visited"
+            ? "SORT scalar d_full"
+            : phaseId === "return-results"
+              ? "RETURN TOP k"
+              : "PQ LUT SUM";
+      const exactWork = ["record-current-vector", "rerank-visited", "return-results"].includes(phaseId);
+      obsBox(aluX, aluY, aluW, aluH, { fill: exactWork ? "#4a251e" : "#3a3014", stroke: exactWork ? COLORS.full : "#8f772c", radius: 3 });
+      obsText(aluLabel, aluX + aluW / 2, aluY + aluH / 2 + 3, { size: scene.mobile ? 6 : 8, data: true, color: exactWork ? "#ffc1b5" : COLORS.cpu, align: "center", weight: 900, maxWidth: aluW - 8 });
+      const queues = obsQueue(host, scene, exact);
+      return {
+        alu: { x: aluX + aluW / 2, y: aluY + aluH / 2 },
+        queue: queues.candidate,
+        candidate: queues.candidate,
+        seen: queues.seen,
+        exact: queues.exact,
+      };
+    }
+
+    function obsEventProgress(trace, lane, direction) {
+      const events = trace?.events || trace?.allEvents || [];
+      const exact = events.filter((event) => (event.lane === lane || event.lane === "shared") && (!direction || event.direction === direction));
+      const current = exact.find((event) => event.status === "current");
+      const completed = exact.filter((event) => event.status === "completed");
+      return { current, completed, active: Boolean(current), done: completed.length > 0 };
+    }
+
+    function obsMovingCartridge(from, to, progress, method, dataset, scene) {
+      const point = mixPoint(from, to, smooth(progress));
+      const stats = BLOCKS[dataset] || BLOCKS.SIFT1B;
+      const count = stats[method];
+      const width = scene.mobile ? 34 : 48;
+      const height = scene.mobile ? 16 : 21;
+      ctx.save();
+      ctx.shadowColor = "rgba(53,200,176,.45)";
+      ctx.shadowBlur = 12;
+      obsBox(point.x - width / 2, point.y - height / 2, width, height, { fill: "#164b46", stroke: COLORS.ssd, radius: 2 });
+      obsText(`${count}×4K`, point.x, point.y + 3, { size: scene.mobile ? 5.5 : 7, data: true, color: "#c5f4ea", align: "center", weight: 900 });
+      ctx.restore();
+    }
+
+    function obsBaseLane(layout, method, state, context, scene) {
+      const lane = layout[method];
+      const dimmed = state.view !== "split" && state.view !== method;
+      const phaseId = context?.phase?.id || "";
+      ctx.save();
+      ctx.globalAlpha *= dimmed ? .18 : 1;
+      obsLaneHeader(lane, method, state, scene);
+      const exact = ["record-current-vector", "rerank-visited", "return-results"].includes(phaseId);
+      const cpu = obsCpu(lane.host, scene, exact, phaseId);
+      obsTierBox(lane.dram, "DRAM · RESIDENT + TEMPORARY", COLORS.dram, scene);
+      const memory = obsScratch(lane.dram, method, scene, phaseId);
+      obsTierBox(lane.ssd, "SSD · NODE p @ LBA(p)", COLORS.ssd, scene);
+      const storage = obsSsdBlocks(lane.ssd, method, state.dataset, scene);
+
+      const requestFrom = { x: lane.host.x + lane.host.width * .86, y: lane.host.y + lane.host.height * .68 };
+      const requestTo = { x: storage.top.x, y: storage.top.y - 3 };
+      const returnFrom = { x: storage.center.x, y: storage.top.y + 3 };
+      const returnTo = { x: memory.scratch.x + memory.scratch.width / 2, y: memory.scratch.y + memory.scratch.height - 3 };
+      obsArrow(requestFrom, requestTo, { color: "#8aa0a7", width: 1.2, alpha: .32, dash: [5, 5] });
+      obsArrow(returnFrom, returnTo, { color: COLORS.ssd, width: scene.mobile ? 3 : 4.5, alpha: .32 });
+
+      ctx.restore();
+      return { lane, cpu, memory, storage, requestFrom, requestTo, returnFrom, returnTo, dimmed };
+    }
+
+    function obsLayoutScene(parts, state, context, scene) {
+      const phaseId = context?.phase?.id || "";
+      [parts.diskann, parts.aisaq].forEach((part) => {
+        if (part.dimmed) return;
+        ctx.save();
+        const method = part === parts.diskann ? "diskann" : "aisaq";
+        const label = method === "diskann" ? "N PQ CODES RESIDENT" : "PQ DUPLICATED IN SSD CHUNKS";
+        const target = method === "diskann" ? part.memory.bank : part.lane.ssd;
+        ctx.strokeStyle = method === "diskann" ? COLORS.dram : COLORS.ssd;
+        ctx.lineWidth = 2;
+        ctx.setLineDash(method === "aisaq" ? [6, 4] : []);
+        ctx.strokeRect(target.x - 2, target.y - 2, target.width + 4, target.height + 4);
+        ctx.setLineDash([]);
+        if (labelsEnabled) obsText(label, target.x + target.width / 2, target.y + target.height - 6, { size: scene.mobile ? 5.3 : 7, data: true, color: method === "diskann" ? "#bfd0ff" : "#b8efe3", align: "center", weight: 900, maxWidth: target.width - 8 });
+        ctx.restore();
+      });
+      if (phaseId === "prebuilt-not-transfer") {
+        obsText("PREBUILT LAYOUTS · NOTHING MIGRATES BETWEEN METHODS AT QUERY TIME", scene.x + scene.width / 2, scene.y + scene.height - 8, { size: scene.mobile ? 6 : 8.5, data: true, color: COLORS.cpu, align: "center", weight: 900, maxWidth: scene.width - 20 });
+      }
+    }
+
+    function obsHostScene(parts, state, context, scene) {
+      [parts.diskann, parts.aisaq].forEach((part) => {
+        if (part.dimmed) return;
+        const qFrom = { x: scene.x + scene.width * .18, y: parts.layout.common.y + parts.layout.common.height * .58 };
+        obsArrow(qFrom, part.cpu.alu, { color: COLORS.cpu, width: 2, alpha: .66, progress: context.phaseProgress });
+        const seed = part === parts.diskann ? part.memory.bank : part.memory.bank;
+        obsArrow({ x: seed.x + seed.width / 2, y: seed.y }, part.cpu.alu, { color: COLORS.dram, width: 2.4, alpha: .7, progress: context.phaseProgress });
+      });
+    }
+
+    function obsReadScene(parts, state, context, scene) {
+      const trace = context?.trace || {};
+      ["diskann", "aisaq"].forEach((method) => {
+        const part = parts[method];
+        if (part.dimmed) return;
+        const down = obsEventProgress(trace, method, "down");
+        const up = obsEventProgress(trace, method, "up");
+        [-10, -5, 5].forEach((offset) => {
+          obsArrow(
+            { x: part.requestFrom.x + offset, y: part.requestFrom.y },
+            { x: part.requestTo.x + offset * .45, y: part.requestTo.y },
+            { color: "#7f9298", width: 1, alpha: .13, dash: [3, 6] },
+          );
+        });
+        obsArrow(part.requestFrom, part.requestTo, {
+          color: "#a6b6ba", width: 2, alpha: down.active || down.done ? .9 : .4, dash: [6, 5], progress: down.current?.progress,
+        });
+        obsArrow(part.returnFrom, part.returnTo, {
+          color: COLORS.ssd, width: scene.mobile ? 4 : 6, alpha: up.active || up.done ? .95 : .42, progress: up.current?.progress,
+        });
+        if (up.active) obsMovingCartridge(part.returnFrom, part.returnTo, up.current.progress, method, state.dataset, scene);
+        if (up.done || ["unpack-common-fields", "reveal-neighbor-codes"].includes(context?.phase?.id)) {
+          const scratch = part.memory.scratch;
+          obsPayloadFields(scratch.x + 4, scratch.y + scratch.height * .38, scratch.width - 8, scratch.height * .34, method, state.dataset, { compact: true });
+        }
+        obsText("ENLARGED: 1 OF ≤ w NODE READS", part.lane.host.x + part.lane.host.width - 6, part.lane.host.y + part.lane.host.height - 5, { size: scene.mobile ? 4.4 : 6, data: true, color: "#72878d", align: "right", weight: 800, maxWidth: part.lane.host.width * .62 });
+      });
+    }
+
+    function obsScoreScene(parts, state, context, scene) {
+      const progress = context.phaseProgress || 0;
+      ["diskann", "aisaq"].forEach((method) => {
+        const part = parts[method];
+        if (part.dimmed) return;
+        const source = method === "diskann"
+          ? { x: part.memory.bank.x + part.memory.bank.width / 2, y: part.memory.bank.y }
+          : { x: part.memory.scratch.x + part.memory.scratch.width / 2, y: part.memory.scratch.y };
+        const color = method === "diskann" ? COLORS.dram : COLORS.pq;
+        obsArrow(source, part.cpu.alu, { color, width: scene.mobile ? 3 : 4, alpha: .9, progress });
+        if (context?.phase?.id === "update-candidates") {
+          obsArrow(part.cpu.alu, part.cpu.candidate, { color: COLORS.cpu, width: 3, alpha: .9, progress });
+        }
+      });
+      if (context?.phase?.id === "release-hop-payload") {
+        obsText("INLINE PQ SCRATCH RELEASED AFTER SCORE · SSD COPY UNCHANGED", scene.x + scene.width / 2, scene.y + scene.height - 8, { size: scene.mobile ? 5.5 : 8, data: true, color: "#9db0b5", align: "center", weight: 900, maxWidth: scene.width - 18 });
+      }
+    }
+
+    function obsCommitScene(parts, state, context, scene) {
+      const progress = context.phaseProgress || 0;
+      const phaseId = context?.phase?.id || "";
+      ["diskann", "aisaq"].forEach((method) => {
+        const part = parts[method];
+        if (part.dimmed) return;
+        const scratch = part.memory.scratch;
+        const full = { x: scratch.x + scratch.width * .2, y: scratch.y + scratch.height * .58 };
+        if (phaseId === "record-current-vector") {
+          const live = 1 - smooth(clamp((progress - .72) / .18, 0, 1));
+          ctx.save();
+          ctx.globalAlpha *= live;
+          obsBox(scratch.x + 5, scratch.y + scratch.height * .42, scratch.width - 10, scratch.height * .28, { fill: COLORS.full, stroke: "#ffb2a3", radius: 2 });
+          obsText("full(p) · LIVE FOR EXACT SCORE", scratch.x + scratch.width / 2, scratch.y + scratch.height * .58 + 3, { size: scene.mobile ? 4.8 : 6.5, data: true, color: "#321713", align: "center", weight: 900, maxWidth: scratch.width - 16 });
+          ctx.restore();
+          if (progress >= .72) {
+            obsText("SCRATCH REUSABLE", scratch.x + scratch.width / 2, scratch.y + scratch.height * .61, { size: scene.mobile ? 4.8 : 6.5, data: true, color: "#82989e", align: "center", weight: 900, maxWidth: scratch.width - 12 });
+          }
+          const qFrom = { x: scene.x + scene.width * .18, y: parts.layout.common.y + parts.layout.common.height * .58 };
+          obsArrow(qFrom, part.cpu.alu, { color: COLORS.cpu, width: scene.mobile ? 1.7 : 2.2, alpha: .72, progress });
+          obsArrow(full, part.cpu.alu, { color: COLORS.full, width: scene.mobile ? 3 : 4.5, alpha: .92, progress });
+          obsArrow(part.cpu.alu, part.cpu.exact, { color: COLORS.full, width: 2.5, alpha: .86, progress });
+        } else if (phaseId === "advance-search") {
+          obsArrow(part.cpu.candidate, part.cpu.alu, { color: COLORS.cpu, width: 2.5, alpha: .86, progress });
+          obsText("REUSABLE", scratch.x + scratch.width / 2, scratch.y + scratch.height * .61, { size: scene.mobile ? 4.8 : 6.5, data: true, color: "#82989e", align: "center", weight: 900, maxWidth: scratch.width - 12 });
+        } else if (["rerank-visited", "return-results"].includes(phaseId)) {
+          obsArrow(part.cpu.exact, part.cpu.alu, { color: COLORS.full, width: 3, alpha: .9, progress });
+        }
+      });
+      const note = phaseId === "rerank-visited"
+        ? "FINAL STEP SORTS STORED SCALARS · NO DEFERRED FULL-VECTOR DISTANCE PASS"
+        : phaseId === "return-results"
+          ? "RETURN TOP k FROM THE SORTED EXACT-SCORE LEDGER"
+          : phaseId === "advance-search"
+            ? "L SELECTS THE NEXT UNEXPANDED p · SCRATCH CAPACITY IS REUSED"
+            : "EXPANSION COMPUTES d_full NOW · EXACT LEDGER RETAINS ID + SCALAR d_full";
+      obsText(note, scene.x + scene.width / 2, scene.y + scene.height - 8, { size: scene.mobile ? 5.3 : 8, data: true, color: COLORS.full, align: "center", weight: 900, maxWidth: scene.width - 18 });
+    }
+
+    function obsBlockRow(x, y, width, height, method, dataset, scene) {
+      const stats = BLOCKS[dataset] || BLOCKS.SIFT1B;
+      const data = PACKING[dataset] || PACKING.SIFT1B;
+      const count = stats[method];
+      const total = stats.bytes[method === "diskann" ? 0 : 1];
+      const fields = [
+        { key: "FULL", start: 0, end: data.full, color: COLORS.full, text: "#2b1510" },
+        { key: "DEG + IDs", start: data.full, end: data.full + data.meta, color: COLORS.ids, text: "#172328" },
+      ];
+      if (method === "aisaq") fields.push({ key: "NEIGHBOR PQ", start: data.full + data.meta, end: total, color: COLORS.pq, text: "#29230c" });
+      const gap = scene.mobile ? 4 : 8;
+      const blockW = (width - gap * (count - 1)) / count;
+      for (let index = 0; index < count; index += 1) {
+        const bx = x + index * (blockW + gap);
+        const start = index * 4096;
+        const end = start + 4096;
+        obsBox(bx, y, blockW, height, { fill: "#102e32", stroke: COLORS.ssd, radius: 3, shadow: !scene.mobile });
+        obsText(`LBA(p)+${index} · 4 KiB`, bx + blockW / 2, y + 14, { size: scene.mobile ? 5.5 : 7, data: true, color: "#a4e5d7", align: "center", weight: 900, maxWidth: blockW - 8 });
+        fields.forEach((field) => {
+          const overlapStart = Math.max(start, field.start);
+          const overlapEnd = Math.min(end, field.end);
+          if (overlapEnd <= overlapStart) return;
+          const fx = bx + 4 + (overlapStart - start) / 4096 * (blockW - 8);
+          const fw = (overlapEnd - overlapStart) / 4096 * (blockW - 8);
+          ctx.fillStyle = field.color;
+          ctx.fillRect(fx, y + 24, fw, height - 31);
+          if (fw > 34 && labelsEnabled) obsText(field.key, fx + fw / 2, y + height * .62, { size: scene.mobile ? 5 : 6.5, data: true, color: field.text, align: "center", weight: 900, maxWidth: fw - 5 });
+        });
+        ctx.strokeStyle = "rgba(217,238,233,.15)";
+        ctx.strokeRect(bx + 4, y + 24, blockW - 8, height - 31);
+      }
+      obsText(`${total.toLocaleString()} B · ${count} LOGICAL READ UNIT${count === 1 ? "" : "S"}`, x + width, y + height + (scene.mobile ? 10 : 14), { size: scene.mobile ? 5.5 : 7.5, data: true, color: method === "aisaq" ? COLORS.cpu : "#b6c6ca", align: "right", weight: 900, maxWidth: width });
+    }
+
+    function obsPackScene(scene, state, context) {
+      const stats = BLOCKS[state.dataset] || BLOCKS.SIFT1B;
+      const pad = scene.mobile ? 8 : 18;
+      const titleY = scene.y + 46;
+      obsText("ONE NODE CHUNK · CONTIGUOUS 4 KiB LOGICAL READ UNITS", scene.x + scene.width / 2, titleY, { size: scene.mobile ? 8 : 12, data: true, color: "#e4ece9", align: "center", weight: 900, maxWidth: scene.width - 20 });
+      obsText("Not a NAND erase block · byte spans are derived from Table 1 and the paper formula", scene.x + scene.width / 2, titleY + (scene.mobile ? 13 : 18), { size: scene.mobile ? 5.5 : 7.5, data: true, color: "#849ba2", align: "center", maxWidth: scene.width - 20 });
+      const rowGap = scene.mobile ? 38 : 56;
+      const rowHeight = Math.max(64, (scene.height - 150 - rowGap) / 2);
+      const firstY = titleY + (scene.mobile ? 38 : 50);
+      ["diskann", "aisaq"].forEach((method, index) => {
+        const dimmed = state.view !== "split" && state.view !== method;
+        ctx.save();
+        ctx.globalAlpha *= dimmed ? .18 : 1;
+        const y = firstY + index * (rowHeight + rowGap);
+        const labelW = scene.mobile ? 58 : 92;
+        obsText(method === "diskann" ? "■ DISKANN" : "◆ AISAQ", scene.x + pad, y + 18, { size: scene.mobile ? 7 : 9, data: true, color: "#e9f0ed", weight: 900 });
+        obsText(method === "diskann" ? "B_D = full + 4(R+1)" : "B_A = B_D + R·bPQ", scene.x + pad, y + 34, { size: scene.mobile ? 5.5 : 7, data: true, color: method === "aisaq" ? COLORS.cpu : "#8ca2a9", maxWidth: labelW });
+        obsBlockRow(scene.x + pad + labelW, y, scene.width - pad * 2 - labelW, rowHeight, method, state.dataset, scene);
+        ctx.restore();
+      });
+      obsText(`${stats.label} · DISKANN ${stats.diskann} → AISAQ ${stats.aisaq} BLOCK${stats.aisaq === 1 ? "" : "S"}`, scene.x + scene.width / 2, scene.y + scene.height - 10, { size: scene.mobile ? 7 : 10, data: true, color: COLORS.cpu, align: "center", weight: 900, maxWidth: scene.width - 20 });
+    }
+
+    function obsEvidenceScene(scene, state) {
+      const values = MEMORY[state.dataset] || MEMORY.SIFT1B;
+      const maxLog = Math.log10(Math.max(values.diskann, values.aisaq));
+      const baseY = scene.y + scene.height * .77;
+      const maxH = scene.height * .48;
+      const barW = Math.min(150, scene.width * .18);
+      const center = scene.x + scene.width / 2;
+      const methods = [
+        { id: "diskann", x: center - barW * 1.35, memory: values.diskann, load: values.loadDisk },
+        { id: "aisaq", x: center + barW * .35, memory: values.aisaq, load: values.loadAi },
+      ];
+      obsText("PAPER-REPORTED PEAK PROCESS MEMORY", center, scene.y + 50, { size: scene.mobile ? 8 : 12, data: true, color: "#e7efec", align: "center", weight: 900, maxWidth: scene.width - 20 });
+      obsText("Table 2 · log-height bars · not an independent reproduction", center, scene.y + (scene.mobile ? 65 : 70), { size: scene.mobile ? 5.5 : 7.5, data: true, color: "#81989f", align: "center", maxWidth: scene.width - 20 });
+      methods.forEach((method) => {
+        const dimmed = state.view !== "split" && state.view !== method.id;
+        const height = Math.max(24, maxH * Math.log10(Math.max(1.1, method.memory)) / Math.max(1, maxLog));
+        ctx.save();
+        ctx.globalAlpha *= dimmed ? .18 : 1;
+        const color = method.id === "diskann" ? COLORS.dram : COLORS.ssd;
+        obsBox(method.x, baseY - height, barW, height, { fill: rgba(color, .58), stroke: color, accent: color, radius: 3, shadow: true });
+        obsText(method.id === "diskann" ? "■ DISKANN" : "◆ AISAQ", method.x + barW / 2, baseY + 20, { size: scene.mobile ? 7 : 9, data: true, color: "#dfe9e6", align: "center", weight: 900 });
+        obsText(`${method.memory.toLocaleString()} MB`, method.x + barW / 2, baseY - height + 25, { size: scene.mobile ? 9 : 14, data: true, color: "#ffffff", align: "center", weight: 900, maxWidth: barW - 10 });
+        obsText(`LOAD ${method.load.toLocaleString()} ms`, method.x + barW / 2, baseY - height + 43, { size: scene.mobile ? 5.5 : 7.5, data: true, color: "#c1d0d2", align: "center", weight: 800, maxWidth: barW - 10 });
+        ctx.restore();
+      });
+      obsText("AiSAQ saves dataset-scale PQ residency; it does not mean zero RAM or zero I/O.", center, scene.y + scene.height - 20, { size: scene.mobile ? 6 : 8.5, data: true, color: COLORS.cpu, align: "center", weight: 900, maxWidth: scene.width - 24 });
+    }
+
+    function obsRenderLayered(scene, state, context) {
+      const layout = obsLayout(scene);
+      obsStageRail(scene, state, context);
+      obsCommonHost(layout.common, state, context);
+      const parts = {
+        layout,
+        diskann: obsBaseLane(layout, "diskann", state, context, scene),
+        aisaq: obsBaseLane(layout, "aisaq", state, context, scene),
+      };
+      const family = context?.trace?.sceneFamily || context?.trace?.scene?.family || "layout";
+      if (family === "layout") obsLayoutScene(parts, state, context, scene);
+      else if (family === "host") obsHostScene(parts, state, context, scene);
+      else if (family === "read") obsReadScene(parts, state, context, scene);
+      else if (family === "score") obsScoreScene(parts, state, context, scene);
+      else if (family === "commit") obsCommitScene(parts, state, context, scene);
+    }
+
     function render(state, context) {
       const now = performance.now();
       const motionSeconds = Math.min(.05, Math.max(0, (now - lastMotionFrame) / 1000));
       if (state.playing && !reducedMotion) motionTime += motionSeconds;
       lastMotionFrame = now;
       updateCamera(state, context || {}, now);
-      const project = makeProjection();
-      const ambientTime = motionTime;
-      const phaseId = context && context.phase ? context.phase.id : "";
-      const phaseProgress = context && Number.isFinite(context.phaseProgress) ? context.phaseProgress : 0;
       labelsEnabled = state.labels !== false;
 
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-      drawGradientSky();
-      drawFloor(project);
-      drawRoute(project, ambientTime);
-      drawBackground(project, ambientTime);
-
-      stationScreens = STATIONS.map((station, index) => ({ index, point: project(station.x, station.y, 1.3) }));
-      const ordered = STATIONS.map((station, index) => ({ station, index })).sort((a, b) => (a.station.x + a.station.y) - (b.station.x + b.station.y));
-      ordered.forEach(({ station, index }) => {
-        const active = index === state.stageIndex;
-        drawPlatform(project, station, active, ambientTime);
-        drawMachine(project, station, "diskann", active, phaseId, phaseProgress, state, ambientTime);
-        drawMachine(project, station, "aisaq", active, phaseId, phaseProgress, state, ambientTime);
-        drawStationLabel(project, station, index, active);
-      });
-
-      drawQueryTravel(project, state, context || {}, ambientTime);
-      drawInvariantRail(project);
+      const scene = obsSceneRect();
+      obsBackground(scene);
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(scene.x, scene.y, scene.width, scene.height);
+      ctx.clip();
+      obsWorldTransform(scene);
+      const family = context?.trace?.sceneFamily || context?.trace?.scene?.family || "layout";
+      if (family === "pack") {
+        stationScreens = [];
+        obsStageRail(scene, state, context || {});
+        obsPackScene(scene, state, context || {});
+      } else if (family === "evidence") {
+        stationScreens = [];
+        obsStageRail(scene, state, context || {});
+        obsEvidenceScene(scene, state);
+      } else {
+        obsRenderLayered(scene, state, context || {});
+      }
+      ctx.restore();
       return !reducedMotion || state.playing;
     }
 
     function zoomBy(delta) {
       const base = cameraMode === "manual" ? manualTarget : camera;
       cameraMode = "manual";
-      manualTarget = { x: base.x, y: base.y, zoom: clamp(base.zoom + delta, .29, 1.61) };
+      manualTarget = { x: base.x, y: base.y, zoom: clamp(base.zoom + delta, .72, 1.48) };
     }
 
     function fit() {
@@ -795,13 +1490,11 @@
     }
 
     function panBy(screenX, screenY) {
-      const tileW = Math.max(1, 52 * camera.zoom);
-      const tileH = Math.max(1, 27 * camera.zoom);
       const base = cameraMode === "manual" ? manualTarget : camera;
       cameraMode = "manual";
       manualTarget = {
-        x: base.x - screenX / tileW - screenY / tileH,
-        y: base.y + screenX / tileW - screenY / tileH,
+        x: clamp(base.x + screenX / 18, -16, 16),
+        y: clamp(base.y + screenY / 18, -12, 12),
         zoom: base.zoom,
       };
     }
