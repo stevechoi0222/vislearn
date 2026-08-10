@@ -13,8 +13,11 @@ This record covers the current local implementation. It is not deployment proof,
 - A transparent Three.js server cutaway is the dominant first-viewport surface, spanning CPU, host DRAM, PCIe/NVMe, SSD controller/NAND, and inward-facing GPU/VRAM boards.
 - The primary renderer dynamically imports Three.js 0.185.1 from jsDelivr. Import or WebGL failure automatically selects the repository's local 2D Canvas renderer.
 - The upper-left semantic ledger exposes Request/Address, Data Return, and Compute/Commit state from `traceSnapshot()` but is intentionally not an ARIA live region. `#phase-live` handles discrete phase and checkpoint announcements.
-- The right learning inspector is narrower than the previous guide and collapses to a 44px peek at 760px and below.
+- The former large scene headline is a compact source → payload → destination route card, leaving the active server path visible.
+- Anime.js 4.5.0 animates route pulses, hardware-beat captions, active trace state, and stage/action explanation transitions. Simulation progress remains the authoritative renderer clock.
+- The right learning inspector exposes common action, DiskANN, AiSAQ, and difference copy in beginner mode, and collapses to a 44px peek at 760px and below.
 - The bottom dock includes Run Full Path, Previous, Play/Pause, Next, Replay Phase, stage-local scrub, Research detail, overall progress, and responsive camera, follow, and label controls.
+- Playback holds for 2.2 real-time seconds at a new stage and 1.4 seconds at a new action, preserving the remaining hold across pause/resume and keeping holds independent of the speed control.
 - The renderer consumes 12 hardware beats: inspect, request, NAND read, block return, DRAM join, inline unpack, PQ score, exact score, queue commit, scratch release, block pack, and evidence.
 - Beginner text is the default. Research fields expose event ID, phase-relative window, evidence status, memory figures, and derived block span only when enabled.
 - The paper-scope badge identifies arXiv v2’s evaluated full-inline layout and the cache-miss/caches-omitted teaching boundary.
@@ -37,6 +40,7 @@ This record covers the current local implementation. It is not deployment proof,
 - Canvas has a semantic label, synchronized fallback summary, and polite phase live region.
 - Scrubbing uses a native keyboard-operable range input with updated value text.
 - Reduced-motion mode starts paused and collapses CSS transition durations.
+- An explicit Play action in reduced-motion mode retains the non-visual reading hold while Anime.js transitions remain disabled.
 - Mobile primary controls, inspector handle, and camera controls use 44px targets. The 208px mobile dock retains Run Full Path.
 - Collapsed inspector content is inert.
 - Global CSS prevents horizontal document scrolling; lower learning sections stack at the mobile breakpoint.
@@ -46,6 +50,7 @@ This record covers the current local implementation. It is not deployment proof,
 - JavaScript syntax checks passed for every `js/*.js` file.
 - The static-integrity check passed for document IDs, local references, and script ordering.
 - The trace-contract check passed across all seven stages, 27 phases, and 86 events, including the hardware snapshot and compute-path contracts.
+- The trace-contract check also covers stage/action dwell duration, pause/resume continuity, manual-navigation clearing, reduced-motion Play behavior, and one-boundary-at-a-time advancement.
 - `git diff --check` passed.
 - Browser verification loaded the primary renderer as `hardware-3d` with zero warnings or errors in the browser console.
 - Browser captures were visually reviewed at 1440 × 900 and 390 × 844. Desktop showed the complete transparent server, inward GPU framing, HUD, scope badge, inspector, and dock. Mobile showed the reframed hardware, collapsed inspector peek, 208px dock, and restored Run Full Path action.

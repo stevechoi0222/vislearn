@@ -2,7 +2,7 @@
 
 Byte Transit Observatory is a visual explanation of **AiSAQ** based on [arXiv:2404.06004v2](https://arxiv.org/abs/2404.06004). A full-screen, transparent 3D server cutaway makes one graph-search hop observable across CPU, host DRAM, PCIe/NVMe, the SSD controller, and NAND. GPU and VRAM are present as an optional, explicitly illustrative route; the default view preserves the paper's CPU path.
 
-The experience is designed for two reading depths: beginner copy explains what moves and why; Research detail exposes event IDs, phase-relative timing, evidence status, memory figures, and derived block spans.
+The experience is designed for two reading depths: the beginner inspector explains what moves and why for every action; Research detail exposes event IDs, phase-relative timing, evidence status, memory figures, and derived block spans.
 
 ## What the trace shows
 
@@ -15,11 +15,11 @@ The experience is designed for two reading depths: beginner copy explains what m
 
 The two methods remain separate comparison lanes. CPU, DRAM, and SSD colors identify memory tiers across both lanes; they are not method identities.
 
-The animation is driven by 12 named hardware beats: inspect, request, NAND read, block return, DRAM join, inline unpack, PQ score, exact score, queue commit, scratch release, block pack, and evidence. Those beats keep the hardware fixed while changing the payload, route, highlight, and camera target.
+The animation is driven by 12 named hardware beats: inspect, request, NAND read, block return, DRAM join, inline unpack, PQ score, exact score, queue commit, scratch release, block pack, and evidence. Those beats keep the hardware fixed while changing the payload, route, highlight, and camera target. A compact Anime.js route card mirrors each beat as source → payload → destination without covering the server cutaway.
 
 ## Controls
 
-Run the full seven-stage path, play or pause, move to the previous or next phase, replay the current phase, scrub within it, restart, change dataset or speed, and switch between paired or single-method views. The camera supports guided follow, pointer orbit, zoom, fit, and labels. The compute-path selector defaults to `Paper path · CPU`; `GPU assist · illustrative` branches host-prepared scoring operands through PCIe, VRAM, and GPU, then returns the scalar result to host-owned search state. It does not rewrite the paper's SSD request and NAND-return path.
+Run the full seven-stage path, play or pause, move to the previous or next phase, replay the current phase, scrub within it, restart, change dataset or speed, and switch between paired or single-method views. Playback holds for 2.2 seconds at each new stage and 1.4 seconds at each new action so the explanation can be read before motion resumes; these reading holds are not shortened by the speed control. The camera supports guided follow, pointer orbit, zoom, fit, and labels. The compute-path selector defaults to `Paper path · CPU`; `GPU assist · illustrative` branches host-prepared scoring operands through PCIe, VRAM, and GPU, then returns the scalar result to host-owned search state. It does not rewrite the paper's SSD request and NAND-return path.
 
 Keyboard stepping, visible focus, reduced-motion behavior, semantic Canvas fallback text, and a collapsible mobile inspector are included. The visible trace ledger is a synchronized status panel, not an ARIA live region; phase-transition announcements are isolated in `#phase-live` so progress animation does not continuously interrupt assistive technology.
 
@@ -31,7 +31,7 @@ No package install or build step is required:
 python3 -m http.server 8000
 ```
 
-Open <http://localhost:8000>. The site is static HTML, CSS, and JavaScript with no backend or tracking. Its primary renderer dynamically imports Three.js 0.185.1 from jsDelivr at runtime, so the 3D view requires network access to that module. If the import or WebGL initialization fails, the experience automatically falls back to the repository's local 2D Canvas renderer.
+Open <http://localhost:8000>. The site is static HTML, CSS, and JavaScript with no backend or tracking. Its primary renderer dynamically imports Three.js 0.185.1 and its explanation transitions load the pinned Anime.js 4.5.0 UMD bundle from jsDelivr at runtime. If Three.js or WebGL initialization fails, the experience automatically falls back to the repository's local 2D Canvas renderer; if Anime.js is unavailable, all content and controls remain visible with static transitions.
 
 ## Source and fidelity
 

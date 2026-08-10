@@ -169,24 +169,115 @@ manualControls.forEach(([name, operate]) => {
   require(sim.state.autoTour === false, `${name} did not cancel auto-tour`);
 });
 
+const nearlyEqual = (left, right, tolerance = 1e-7) => Math.abs(left - right) <= tolerance;
+
+const held = new Simulation(content.stages);
+const initialDwell = held.dwellSnapshot();
+require(Object.isFrozen(initialDwell), "dwellSnapshot must be read-only");
+require(initialDwell.active && initialDwell.kind === "stage", "Initial autoplay did not hold at the first stage boundary");
+require(nearlyEqual(initialDwell.duration, 2.2) && nearlyEqual(initialDwell.remaining, 2.2), "Stage dwell is not 2.2 real-time seconds");
+held.setSpeed(3);
+held.update(0.6);
+const speedIndependentDwell = held.dwellSnapshot();
+require(held.state.progress === 0, "Stage dwell advanced simulation progress");
+require(nearlyEqual(speedIndependentDwell.remaining, 1.6), "Playback speed scaled the reading dwell");
+held.playPause();
+const pausedRemaining = held.dwellSnapshot().remaining;
+held.update(100);
+require(nearlyEqual(held.dwellSnapshot().remaining, pausedRemaining), "Pausing did not preserve the remaining dwell");
+held.playPause();
+require(nearlyEqual(held.dwellSnapshot().remaining, pausedRemaining), "Resuming restarted the active dwell");
+held.update(0.4);
+require(nearlyEqual(held.dwellSnapshot().remaining, pausedRemaining - 0.4), "Resumed dwell did not continue from its remaining time");
+const heldProgress = held.state.progress;
+held.update(1e6);
+require(!held.dwellSnapshot().active && nearlyEqual(held.state.progress, heldProgress), "A huge delta moved in the same update that completed a dwell");
+held.update(1e6);
+const firstPhaseDwell = held.dwellSnapshot();
+require(firstPhaseDwell.active && firstPhaseDwell.kind === "phase", "Entering the next phase did not start a phase dwell");
+require(nearlyEqual(firstPhaseDwell.duration, 1.4) && nearlyEqual(firstPhaseDwell.remaining, 1.4), "Phase dwell is not 1.4 real-time seconds");
+require(held.phaseIndex() === 1 && nearlyEqual(held.phaseProgress(), 0), "Huge movement delta skipped the next phase boundary");
+
+const dwellClearingControls = [
+  ["next", (sim) => sim.next()],
+  ["previous", (sim) => sim.previous()],
+  ["goTo", (sim) => sim.goTo(2)],
+  ["goToPhase", (sim) => sim.goToPhase(2, 1)],
+  ["setProgress", (sim) => sim.setProgress(0.4)],
+];
+dwellClearingControls.forEach(([name, operate]) => {
+  const sim = new Simulation(content.stages);
+  require(sim.dwellSnapshot().active, `${name} fixture did not begin with an active dwell`);
+  operate(sim);
+  require(!sim.dwellSnapshot().active, `${name} did not clear the active dwell`);
+});
+
+const selectedPhase = new Simulation(content.stages);
+selectedPhase.goToPhase(2, 1);
+const selectedSpan = selectedPhase.phaseSpan();
+require(!selectedPhase.state.playing && !selectedPhase.dwellSnapshot().active, "Manual phase selection unexpectedly kept a dwell active");
+selectedPhase.playPause();
+const selectedDwell = selectedPhase.dwellSnapshot();
+require(selectedDwell.active && selectedDwell.kind === "phase", "Play at a manually selected phase start did not create a dwell");
+selectedPhase.update(0.7);
+require(nearlyEqual(selectedPhase.state.progress, selectedSpan.start), "Manual phase dwell advanced before its reading time elapsed");
+
+const normalMatchMedia = sandbox.window.matchMedia;
+sandbox.window.matchMedia = () => ({ matches: true });
+const reducedMotion = new Simulation(content.stages);
+require(!reducedMotion.state.playing && !reducedMotion.dwellSnapshot().active, "Reduced motion should not force autoplay");
+reducedMotion.playPause();
+require(reducedMotion.state.playing && reducedMotion.dwellSnapshot().active, "Reduced-motion playback lost its reading dwell after explicit Play");
+reducedMotion.update(0.5);
+require(nearlyEqual(reducedMotion.dwellSnapshot().remaining, 1.7), "Reduced-motion reading dwell did not use real time");
+sandbox.window.matchMedia = normalMatchMedia;
+
 const ordinary = new Simulation(content.stages);
-ordinary.update(1e6);
+let ordinarySafety = phaseCount * 3;
+while (ordinary.state.playing && ordinarySafety > 0) {
+  ordinary.update(1e6);
+  ordinarySafety -= 1;
+}
+require(ordinarySafety > 0, "Manual checkpoint flow did not terminate deterministically");
 require(ordinary.state.stageIndex === 0 && ordinary.state.checkpointPaused && !ordinary.state.playing, "Manual checkpoint flow no longer pauses at stage 1");
 
 const tour = new Simulation(content.stages);
 let runAllReason = null;
-tour.subscribe((state, stage, reason) => { if (reason !== "init") runAllReason = reason; });
+const tourPhaseEntries = [];
+const tourStageEntries = [];
+tour.subscribe((state, stage, reason) => {
+  if (reason !== "init") runAllReason = reason;
+  if (reason === "phase") tourPhaseEntries.push(`${state.stageIndex}:${tour.phaseIndex()}`);
+  if (reason === "stage") tourStageEntries.push(state.stageIndex);
+});
 tour.runAll();
 require(runAllReason === "runAll", "runAll emitted the wrong reason");
 require(tour.state.stageIndex === 0 && tour.state.progress === 0 && tour.state.autoTour && tour.state.playing, "runAll did not start from stage 1");
-for (let index = 0; index < content.stages.length - 1; index += 1) {
+require(tour.dwellSnapshot().active && tour.dwellSnapshot().kind === "stage", "runAll did not begin with a stage dwell");
+let tourSafety = phaseCount * 3;
+while (tour.state.playing && tourSafety > 0) {
+  const beforeStage = tour.state.stageIndex;
+  const beforePhase = tour.phaseIndex();
+  const beforeProgress = tour.state.progress;
+  const beforeDwell = tour.dwellSnapshot();
   tour.update(1e6);
-  require(tour.state.stageIndex === index + 1, `runAll did not advance after stage ${index + 1}`);
-  require(tour.state.autoTour && tour.state.playing && !tour.state.checkpointPaused, `runAll paused at intermediate stage ${index + 1}`);
+  if (beforeDwell.active) {
+    require(tour.state.stageIndex === beforeStage && nearlyEqual(tour.state.progress, beforeProgress), "Huge delta moved while completing a tour dwell");
+  } else if (tour.state.stageIndex === beforeStage) {
+    require(tour.phaseIndex() - beforePhase <= 1, "Huge delta skipped a phase boundary during the full tour");
+  } else {
+    require(tour.state.stageIndex === beforeStage + 1 && tour.state.progress === 0, "Huge delta skipped a stage boundary during the full tour");
+  }
+  if (tour.state.stageIndex < content.stages.length - 1) {
+    require(tour.state.autoTour && tour.state.playing && !tour.state.checkpointPaused, `runAll paused at intermediate stage ${tour.state.stageIndex + 1}`);
+  }
+  tourSafety -= 1;
 }
-tour.update(1e6);
+require(tourSafety > 0, "runAll did not terminate deterministically");
 require(tour.state.stageIndex === content.stages.length - 1 && tour.state.progress === 1, "runAll did not finish the final stage");
 require(!tour.state.autoTour && !tour.state.playing && tour.state.checkpointPaused, "runAll did not stop only at the final checkpoint");
+require(tourPhaseEntries.length === phaseCount - content.stages.length, "runAll did not expose every newly entered non-initial phase");
+require(tourStageEntries.length === content.stages.length - 1, "runAll did not expose every newly entered stage");
 
 const unsafe = new Simulation([{
   id: "adapter-guard",

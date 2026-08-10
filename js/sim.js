@@ -2,6 +2,10 @@
   "use strict";
 
   const EPSILON = 1e-8;
+  const DWELL_SECONDS = Object.freeze({
+    phase: 1.4,
+    stage: 2.2,
+  });
   const HARDWARE_BEATS = new Set([
     "inspect", "request", "nand-read", "block-return", "dram-join", "inline-unpack",
     "pq-score", "exact-score", "queue-commit", "scratch-release", "block-pack", "evidence",
@@ -48,6 +52,9 @@
       };
       this.checkedStages = new Set();
       this.listeners = new Set();
+      this._dwell = null;
+      this._dwellBoundary = null;
+      if (this.state.playing) this._startDwell();
     }
 
     get stage() { return this.stages[this.state.stageIndex]; }
@@ -359,15 +366,96 @@
       this.listeners.forEach((listener) => listener(this.state, this.stage, reason));
     }
 
+    _boundaryAtCurrentProgress() {
+      const progress = Math.max(0, Math.min(1, Number(this.state.progress) || 0));
+      if (progress >= 1 - EPSILON) return null;
+      if (progress <= EPSILON) {
+        return {
+          kind: "stage",
+          key: `stage:${this.state.stageIndex}`,
+        };
+      }
+      const timeline = this._timeline();
+      for (let index = 1; index < timeline.length; index += 1) {
+        if (Math.abs(progress - timeline[index].start) <= EPSILON) {
+          return {
+            kind: "phase",
+            key: `phase:${this.state.stageIndex}:${index}`,
+          };
+        }
+      }
+      return null;
+    }
+
+    _startDwell() {
+      const boundary = this._boundaryAtCurrentProgress();
+      if (!boundary) return false;
+      const duration = DWELL_SECONDS[boundary.kind];
+      this._dwellBoundary = boundary.key;
+      this._dwell = {
+        kind: boundary.kind,
+        duration,
+        remaining: duration,
+      };
+      return true;
+    }
+
+    _ensureBoundaryDwell() {
+      const boundary = this._boundaryAtCurrentProgress();
+      if (!boundary || boundary.key === this._dwellBoundary) return false;
+      return this._startDwell();
+    }
+
+    _clearDwell(forgetBoundary) {
+      this._dwell = null;
+      if (forgetBoundary) this._dwellBoundary = null;
+    }
+
+    dwellSnapshot() {
+      if (!this._dwell) {
+        return Object.freeze({
+          active: false,
+          kind: null,
+          progress: 0,
+          remaining: 0,
+          duration: 0,
+        });
+      }
+      const duration = this._dwell.duration;
+      const remaining = Math.max(0, Math.min(duration, this._dwell.remaining));
+      return Object.freeze({
+        active: true,
+        kind: this._dwell.kind,
+        progress: Math.max(0, Math.min(1, (duration - remaining) / duration)),
+        remaining,
+        duration,
+      });
+    }
+
     update(seconds) {
       const state = this.state;
       const delta = Math.max(0, Number(seconds) || 0);
       if (!state.playing || delta <= 0) return false;
 
-      state.elapsed += delta;
-      const phaseBefore = this.phaseIndex();
+      if (this._ensureBoundaryDwell()) {
+        this.emit("dwell");
+        return true;
+      }
+
+      if (this._dwell) {
+        const consumed = Math.min(delta, this._dwell.remaining);
+        this._dwell.remaining = Math.max(0, this._dwell.remaining - consumed);
+        state.elapsed += consumed;
+        if (this._dwell.remaining <= EPSILON) {
+          this._clearDwell(false);
+          this.emit("dwell");
+        }
+        return true;
+      }
+
       const stageDuration = Number(this.stage && this.stage.duration);
-      const phaseDuration = this._timeline().reduce((sum, span) => {
+      const timeline = this._timeline();
+      const phaseDuration = timeline.reduce((sum, span) => {
         const value = Number(span.phase && (span.phase.duration ?? span.phase.weight));
         return sum + (Number.isFinite(value) && value > 0 ? value : 1);
       }, 0);
@@ -375,10 +463,24 @@
         ? stageDuration
         : Math.max(1, phaseDuration);
 
-      state.progress = Math.min(1, state.progress + (delta * state.speed) / duration);
-      const phaseAfter = this.phaseIndex();
+      const phaseIndex = this.phaseIndex();
+      const phaseEnd = timeline[phaseIndex].end;
+      const nextProgress = state.progress + (delta * state.speed) / duration;
+      if (nextProgress < phaseEnd - EPSILON) {
+        state.progress = nextProgress;
+        state.elapsed += delta;
+        return true;
+      }
 
-      if (phaseAfter !== phaseBefore) this.emit("phase");
+      const progressToBoundary = Math.max(0, phaseEnd - state.progress);
+      state.elapsed += progressToBoundary * duration / Math.max(EPSILON, state.speed);
+      state.progress = phaseEnd;
+
+      if (phaseEnd < 1 - EPSILON) {
+        this._startDwell();
+        this.emit("phase");
+        return true;
+      }
 
       if (state.progress >= 1 - EPSILON) {
         if (state.autoTour && state.stageIndex < this.stages.length - 1) {
@@ -387,6 +489,7 @@
           state.progress = 0;
           state.checkpointPaused = false;
           state.playing = true;
+          this._startDwell();
           this.emit("stage");
           return true;
         }
@@ -410,17 +513,20 @@
         }
         this.restart();
         state.playing = true;
+        this._ensureBoundaryDwell();
         this.emit("play");
         return;
       }
       state.checkpointPaused = false;
       state.playing = !state.playing;
+      if (state.playing) this._ensureBoundaryDwell();
       this.emit("play");
     }
 
     next() {
       const state = this.state;
       state.autoTour = false;
+      this._clearDwell(true);
       const timeline = this._timeline();
       const index = this.phaseIndex();
       state.playing = false;
@@ -448,6 +554,7 @@
     previous() {
       const state = this.state;
       state.autoTour = false;
+      this._clearDwell(true);
       const timeline = this._timeline();
       const index = this.phaseIndex();
       state.playing = false;
@@ -479,6 +586,7 @@
 
     goTo(index) {
       this.state.autoTour = false;
+      this._clearDwell(true);
       const numeric = Number(index);
       const requested = Number.isFinite(numeric) ? Math.trunc(numeric) : 0;
       const next = Math.max(0, Math.min(this.stages.length - 1, requested));
@@ -493,6 +601,7 @@
     goToPhase(stageIndex, phaseIndex) {
       const state = this.state;
       state.autoTour = false;
+      this._clearDwell(true);
       const oldStageIndex = state.stageIndex;
       const oldPhaseIndex = this.phaseIndex();
       const numericStage = Number(stageIndex);
@@ -518,6 +627,7 @@
     setProgress(value) {
       const numeric = Number(value);
       this.state.autoTour = false;
+      this._clearDwell(true);
       this.state.progress = Math.max(0, Math.min(1, Number.isFinite(numeric) ? numeric : 0));
       this.state.elapsed = 0;
       this.state.playing = false;
@@ -531,16 +641,19 @@
     replayPhase() {
       const span = this.phaseSpan();
       this.state.autoTour = false;
+      this._clearDwell(true);
       this.state.progress = span.start;
       this.state.elapsed = 0;
       this.state.checkpointPaused = false;
       this.checkedStages.delete(this.state.stageIndex);
       this.state.playing = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (this.state.playing) this._ensureBoundaryDwell();
       this.emit("replay");
       return this.traceSnapshot();
     }
 
     runAll() {
+      this._clearDwell(true);
       this.state.stageIndex = 0;
       this.state.progress = 0;
       this.state.elapsed = 0;
@@ -548,11 +661,13 @@
       this.state.autoTour = true;
       this.state.playing = true;
       this.checkedStages.clear();
+      this._startDwell();
       this.emit("runAll");
       return this.traceSnapshot();
     }
 
     restart() {
+      this._clearDwell(true);
       this.state.stageIndex = 0;
       this.state.progress = 0;
       this.state.elapsed = 0;
@@ -560,6 +675,7 @@
       this.state.playing = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       this.state.checkpointPaused = false;
       this.checkedStages.clear();
+      if (this.state.playing) this._startDwell();
       this.emit("restart");
     }
 
@@ -577,11 +693,13 @@
         state.progress = 0;
         state.checkpointPaused = false;
         state.playing = true;
+        this._startDwell();
         this.emit("stage");
         return;
       }
       state.checkpointPaused = false;
       state.playing = true;
+      this._ensureBoundaryDwell();
       this.emit("play");
     }
 

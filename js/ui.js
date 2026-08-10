@@ -151,11 +151,63 @@
     return copy[hardware?.beat] || [phase?.label || "Follow the active hardware path", phase?.shared || "The current trace event is highlighted in the server cutaway."];
   }
 
+  function routeEndpoint(value, fallback) {
+    const raw = String(value || "");
+    const text = raw.toLowerCase();
+    if (text.includes("request-queue")) return "Host request queue";
+    if (text.includes("ssd.controller")) return "SSD controller";
+    if (text.includes("ssd.nand") || text.includes("lba(p)")) return "SSD · NAND";
+    if (text.includes("dram.scratch") || text.includes("scratch-pool")) return "DRAM scratch";
+    if (text.includes("dram.pq-array")) return "DRAM · PQ array";
+    if (text.includes("cpu.lut")) return "CPU · PQ lookup";
+    if (text.includes("cpu.exact")) return "CPU · exact scorer";
+    if (text.includes("seen-ids")) return "Seen-ID set";
+    if (text.includes("candidate-list")) return "Candidate list L";
+    if (text.includes("exact-score")) return "Exact-score ledger";
+    if (text.includes("host.results") || text.includes("host.result")) return "Host result";
+    if (text.includes("gpu.vram")) return "GPU · VRAM";
+    if (text.includes("gpu.compute")) return "GPU scorer";
+    if (text.includes("host.pcie") || text.includes("pcie")) return "PCIe / NVMe";
+    if (text.includes("paper") || text.includes("reader")) return "Paper evidence";
+    return raw.split("+")[0].trim() || fallback;
+  }
+
+  function routePayload(hardware) {
+    if (hardware?.gpu?.active) {
+      const gpu = {
+        "dram-join": "Illustrative scoring operands",
+        "inline-unpack": "Operand copy entering VRAM",
+        "pq-score": "PQ operands → scalar distances",
+        "exact-score": "Full vector → scalar exact distance",
+        "queue-commit": "Scalar result returning to host",
+      };
+      if (gpu[hardware.beat]) return gpu[hardware.beat];
+    }
+    const payload = {
+      inspect: "Resident addresses and reusable buffers",
+      request: "Logical node read · q stays host-side",
+      "nand-read": "Node-chunk bytes at symbolic LBA(p)",
+      "block-return": "Aligned 4 KiB read unit(s)",
+      "dram-join": "Neighbor IDs + resident PQ codes",
+      "inline-unpack": "Neighbor IDs + inline PQ codes",
+      "pq-score": "PQ bytes → scalar distances",
+      "exact-score": "Full vector → scalar exact distance",
+      "queue-commit": "ID + scalar distance only",
+      "scratch-release": "Reusable buffer capacity",
+      "block-pack": "Node chunk across 4 KiB units",
+      evidence: "Paper-reported system costs",
+    };
+    return payload[hardware?.beat] || "Current trace payload";
+  }
+
   function renderHardwareHeadline(sim, phase) {
     const hardware = hardwareSnapshot(sim);
     const movement = hardwareCopy(hardware, phase);
     $("#scene-action-label").textContent = movement[0];
     $("#scene-shared-cue").textContent = movement[1];
+    $("#scene-route-source").textContent = routeEndpoint(hardware?.source, "Fixed hardware");
+    $("#scene-route-destination").textContent = routeEndpoint(hardware?.destination, "Active buffer");
+    $("#scene-route-payload").textContent = routePayload(hardware);
     $(".stage-wrap").dataset.hardwareBeat = hardware?.beat || "inspect";
     return hardware;
   }
@@ -357,7 +409,7 @@
         : state.stageIndex === 5
           ? "derivation"
           : "evidence";
-    renderHardwareHeadline(sim, phase);
+    const hardware = renderHardwareHeadline(sim, phase);
     $("#guide-action-count").textContent = actionCount;
     $("#guide-action-label").textContent = phase.label;
     $("#phase-common").textContent = phase.shared;
@@ -369,11 +421,33 @@
     renderActionList(state, stage, index, sim);
 
     if (announce) {
+      $(".guide-body").scrollTop = 0;
       $("#phase-live").textContent = `Stage ${state.stageIndex + 1}, ${actionCount}: ${phase.label}. ${phase.shared}`;
     }
+    return hardware;
   }
 
-  function renderPlayback(state, sim) {
+  function renderDwell(state, sim, motion) {
+    const snapshot = typeof sim.dwellSnapshot === "function" ? sim.dwellSnapshot() : null;
+    const active = Boolean(snapshot?.active);
+    const fallbackProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
+    const progress = active ? clamp01(snapshot.progress) : clamp01(fallbackProgress);
+    $("#dwell-bar").style.transform = `scaleX(${progress})`;
+    $("#dwell").classList.toggle("is-holding", active);
+
+    const badge = $("#scene-dwell-state");
+    if (active) {
+      const label = snapshot.kind === "stage" ? "Read this stage" : "Read this action";
+      badge.textContent = `${label} · ${Math.max(0, Number(snapshot.remaining) || 0).toFixed(1)}s`;
+    } else if (!state.playing) {
+      badge.textContent = "Paused · inspect this step";
+    } else {
+      badge.textContent = "Watch the highlighted route";
+    }
+    if (motion && typeof motion.dwell === "function") motion.dwell(snapshot);
+  }
+
+  function renderPlayback(state, sim, motion) {
     const label = state.playing ? "Pause" : "Play";
     $("#play-label").textContent = label;
     $("#play-icon").textContent = state.playing ? "Ⅱ" : "▶";
@@ -381,8 +455,7 @@
     const fullRun = $("#tour-start");
     fullRun.textContent = state.autoTour ? "Running full path" : state.stageIndex === 0 && state.progress < .01 ? "Run full path" : "Run from start";
     fullRun.setAttribute("aria-pressed", String(Boolean(state.autoTour)));
-    const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
-    $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
+    renderDwell(state, sim, motion);
     $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
   }
 
@@ -731,6 +804,9 @@
     initQuiz();
     initMenu();
     bindControls(sim);
+    const motion = typeof window.createAiSAQMotion === "function"
+      ? window.createAiSAQMotion()
+      : null;
 
     let lastPhaseKey = null;
     let lastStageIndex = null;
@@ -754,16 +830,20 @@
 
     sim.subscribe((state, stage, reason) => {
       const stageChanged = lastStageIndex === null || lastStageIndex !== state.stageIndex;
-      if (stageChanged || ["init", "stage", "restart", "runAll", "complete"].includes(reason)) renderStage(state, stage);
+      const renderedStage = stageChanged || ["init", "stage", "restart", "runAll", "complete"].includes(reason);
+      if (renderedStage) renderStage(state, stage);
       const phase = phaseFor(sim, stage);
       const phaseKey = `${state.stageIndex}:${phase.id}`;
       const isActualTransition = lastPhaseKey !== null && phaseKey !== lastPhaseKey;
-      renderPhase(state, stage, sim, isActualTransition);
+      const hardware = renderPhase(state, stage, sim, isActualTransition);
       lastPhaseKey = phaseKey;
       lastStageIndex = state.stageIndex;
       if (reason === "checkpoint") surfaceCheckpoint(stage);
-      renderPlayback(state, sim);
       renderTrace(state, stage, sim);
+      if (renderedStage && motion && typeof motion.stage === "function") motion.stage();
+      if ((isActualTransition || ["init", "stage", "restart", "runAll", "replay"].includes(reason)) && motion && typeof motion.phase === "function") motion.phase();
+      if (motion && typeof motion.beat === "function") motion.beat(hardware?.beat);
+      renderPlayback(state, sim, motion);
       if (["init", "dataset"].includes(reason)) renderDataset(state.dataset, reason === "dataset");
       if (["init", "speed"].includes(reason)) $("#speed-value").textContent = `${state.speed}×`;
       if (["init", "view"].includes(reason)) renderView(state);
@@ -772,11 +852,11 @@
 
     return {
       updateProgress(state) {
-        const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
-        $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
+        renderDwell(state, sim, motion);
         $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
-        renderHardwareHeadline(sim, phaseFor(sim, sim.stage || content.stages[state.stageIndex]));
+        const hardware = renderHardwareHeadline(sim, phaseFor(sim, sim.stage || content.stages[state.stageIndex]));
         renderTrace(state, sim.stage || content.stages[state.stageIndex], sim);
+        if (motion && typeof motion.beat === "function") motion.beat(hardware?.beat);
       },
     };
   }
