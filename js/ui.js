@@ -6,16 +6,6 @@
   const $$ = (selector, root) => Array.from((root || document).querySelectorAll(selector));
   const number = new Intl.NumberFormat("en-US");
 
-  const truthByFocus = {
-    overview: "Search touches a small part of the graph, but DiskANN keeps a PQ code ready for every node.",
-    pq: "PQ codes steer graph traversal; full-precision vectors re-rank the visited candidates.",
-    diskann: "The SSD chunk supplies neighbor IDs. The dataset-wide DRAM array supplies their PQ codes.",
-    aisaq: "The graph topology stays the same. Only the placement and lifetime of neighbor PQ codes changes.",
-    blocks: "The animation rounds every node-chunk read up to whole 4 KB blocks, matching the paper's model.",
-    evidence: "Exact table values are shown; untabulated plot coordinates are deliberately omitted.",
-    tradeoffs: "Near-constant PQ working memory is bought with repeated PQ data on SSD and possible extra block reads.",
-  };
-
   function table(id) { return content.benchmarkTables.find((item) => item.id === id); }
   function presetByLabel(label) { return content.blockPackingPresets.find((item) => item.label === label); }
 
@@ -54,7 +44,32 @@
     });
   }
 
+  function phasesFor(stage) {
+    if (Array.isArray(stage.phases) && stage.phases.length) return stage.phases;
+    return [{
+      id: `${stage.id}-overview`,
+      label: stage.navLabel || stage.short || stage.title,
+      shared: stage.summary || stage.body,
+      diskann: stage.body || stage.summary,
+      aisaq: stage.body || stage.summary,
+      difference: stage.learningGoal || "The methods use different data placement while following the same learning stop.",
+      cue: "stage-overview",
+    }];
+  }
+
+  function phaseIndexFor(sim, stage) {
+    const phases = phasesFor(stage);
+    const index = typeof sim.phaseIndex === "function" ? Number(sim.phaseIndex()) : 0;
+    return Math.max(0, Math.min(phases.length - 1, Number.isFinite(index) ? index : 0));
+  }
+
+  function phaseFor(sim, stage) {
+    const fromSimulation = typeof sim.currentPhase === "function" ? sim.currentPhase() : null;
+    return fromSimulation || phasesFor(stage)[phaseIndexFor(sim, stage)];
+  }
+
   function renderStage(state, stage) {
+    $(".stage-wrap").dataset.stage = stage.id;
     $("#stage-count").textContent = `Stop ${state.stageIndex + 1} of ${content.stages.length}`;
     $("#stage-source-short").textContent = stage.sourceLabel.replace(/^Paper\s*/i, "").split("—")[0].trim();
     $("#stage-title").textContent = stage.title;
@@ -62,16 +77,73 @@
     $("#stage-body").textContent = stage.body || stage.summary;
     $("#stage-source").href = stage.sourceUrl;
     $("#stage-source").innerHTML = `${stage.sourceLabel} <span aria-hidden="true">↗</span>`;
-    $("#truth-copy").textContent = truthByFocus[stage.focus] || stage.learningGoal;
     $("#checkpoint-prompt").textContent = stage.checkpoint.prompt;
     $("#checkpoint-reveal-copy").textContent = stage.checkpoint.reveal;
     $("#checkpoint-hint").textContent = `If this is fuzzy: ${stage.checkpoint.confusionHint}`;
     $("#checkpoint-answer").hidden = true;
     $("#checkpoint").classList.remove("active");
+    $("#checkpoint").removeAttribute("aria-current");
+    $(".guide-body").scrollTop = 0;
     $$("#route-list button").forEach((button, index) => {
       if (index === state.stageIndex) button.setAttribute("aria-current", "step");
       else button.removeAttribute("aria-current");
     });
+  }
+
+  function renderActionList(state, stage, activeIndex, sim) {
+    const list = $("#phase-list");
+    const phases = phasesFor(stage);
+    if (list.dataset.stage !== String(state.stageIndex)) {
+      list.innerHTML = "";
+      const stageIndex = state.stageIndex;
+      phases.forEach((phase, index) => {
+        const item = document.createElement("li");
+        item.dataset.phaseIndex = String(index);
+        const button = document.createElement("button");
+        button.type = "button";
+        button.innerHTML = `<span>${index + 1}</span><strong></strong>`;
+        $("strong", button).textContent = phase.label;
+        button.addEventListener("click", () => {
+          if (typeof sim.goToPhase === "function") sim.goToPhase(stageIndex, index);
+        });
+        item.appendChild(button);
+        list.appendChild(item);
+      });
+      list.dataset.stage = String(state.stageIndex);
+    }
+    $$("li", list).forEach((item, index) => {
+      const button = $("button", item);
+      item.classList.toggle("active", index === activeIndex);
+      if (index === activeIndex) button.setAttribute("aria-current", "step");
+      else button.removeAttribute("aria-current");
+    });
+  }
+
+  function renderPhase(state, stage, sim, announce) {
+    const phases = phasesFor(stage);
+    const index = phaseIndexFor(sim, stage);
+    const phase = phaseFor(sim, stage);
+    const progress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
+    const count = phases.length;
+    const actionCount = `Action ${index + 1} of ${count}`;
+
+    $("#scene-action-count").textContent = `Stage ${state.stageIndex + 1} · Action ${index + 1}/${count}`;
+    $("#scene-action-label").textContent = phase.label;
+    $("#scene-shared-cue").textContent = phase.shared;
+    $("#guide-action-count").textContent = actionCount;
+    $("#guide-action-label").textContent = phase.label;
+    $("#phase-common").textContent = phase.shared;
+    $("#phase-diskann").textContent = phase.diskann;
+    $("#phase-aisaq").textContent = phase.aisaq;
+    $("#phase-difference").textContent = phase.difference;
+    $("#learning-guide").dataset.cue = phase.cue;
+    $("#learning-guide").style.setProperty("--action-progress", String(Math.min(1, Math.max(0, progress))));
+    $("#canvas-phase-summary").textContent = `Visual summary. ${actionCount}: ${phase.label}. Common action: ${phase.shared} DiskANN: ${phase.diskann} AiSAQ: ${phase.aisaq} Why it differs: ${phase.difference}`;
+    renderActionList(state, stage, index, sim);
+
+    if (announce) {
+      $("#phase-live").textContent = `Stage ${state.stageIndex + 1}, ${actionCount}: ${phase.label}. ${phase.shared}`;
+    }
   }
 
   function renderPlayback(state, sim) {
@@ -79,7 +151,8 @@
     $("#play-label").textContent = label;
     $("#play-icon").textContent = state.playing ? "Ⅱ" : "▶";
     $("#play").setAttribute("aria-label", `${label} simulation`);
-    $("#dwell-bar").style.transform = `scaleX(${Math.min(1, state.progress)})`;
+    const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
+    $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
     $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
   }
 
@@ -89,7 +162,7 @@
     $("#diskann-memory").textContent = `${number.format(stats.diskannMemory)} MB`;
     $("#aisaq-memory").textContent = `${number.format(stats.aisaqMemory)} MB`;
     $("#diskann-codes").textContent = `${number.format(stats.vectorCount)} PQ codes resident`;
-    $("#aisaq-codes").textContent = `≤ ${stats.degree + 1} PQ codes at once`;
+    $("#aisaq-codes").textContent = `≤ R + n_ep codes · ${stats.degree + 1} if n_ep = 1`;
     $("#block-count").textContent = `${preset.derived.diskannBlocksPerNodeRead.value} → ${preset.derived.aisaqBlocksPerNodeRead.value}`;
     if (syncLab) setLabPreset(preset);
   }
@@ -176,7 +249,7 @@
     const difference = aisaqBlocks - diskBlocks;
     const verdict = $("#block-verdict");
     if (difference === 0) {
-      verdict.innerHTML = `<strong>Same I/O count.</strong> Inline PQ codes still fit in ${aisaqBlocks === 1 ? "one block" : `${aisaqBlocks} blocks`} for this layout.`;
+      verdict.innerHTML = `<strong>Same 4 KB block span.</strong> Inline PQ codes still fit in ${aisaqBlocks === 1 ? "one block" : `${aisaqBlocks} blocks`} for this layout.`;
     } else {
       verdict.innerHTML = `<strong>${difference} extra block${difference === 1 ? "" : "s"} per node chunk.</strong> Inline PQ codes expand the read from ${diskBlocks} to ${aisaqBlocks} blocks in this layout.`;
     }
@@ -293,6 +366,20 @@
     }));
   }
 
+  function renderView(state) {
+    $(".stage-wrap").dataset.view = state.view;
+    $("#learning-guide").dataset.view = state.view;
+    $$("[data-method]").forEach((row) => {
+      const prioritized = state.view !== "split" && row.dataset.method === state.view;
+      row.classList.toggle("prioritized", prioritized);
+    });
+    $$('[data-view]').forEach((button) => {
+      const active = button.dataset.view === state.view;
+      button.classList.toggle("active", active);
+      button.setAttribute("aria-pressed", String(active));
+    });
+  }
+
   function bindAiSAQUI(sim) {
     initRoute(sim);
     initEvidence();
@@ -301,25 +388,49 @@
     initMenu();
     bindControls(sim);
 
+    let lastPhaseKey = null;
+
+    function surfaceCheckpoint(stage) {
+      const checkpoint = $("#checkpoint");
+      checkpoint.classList.add("active");
+      checkpoint.setAttribute("aria-current", "step");
+      $("#phase-live").textContent = `Checkpoint after ${stage.title}. ${stage.checkpoint.prompt}`;
+      requestAnimationFrame(() => {
+        const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+        const behavior = reduced ? "auto" : "smooth";
+        if (window.matchMedia("(max-width: 1100px)").matches) {
+          checkpoint.scrollIntoView({ behavior, block: "center" });
+        } else {
+          const guideBody = $(".guide-body");
+          const bodyRect = guideBody.getBoundingClientRect();
+          const checkpointRect = checkpoint.getBoundingClientRect();
+          const centered = guideBody.scrollTop + checkpointRect.top - bodyRect.top - (guideBody.clientHeight - checkpointRect.height) / 2;
+          guideBody.scrollTo({ top: Math.max(0, centered), behavior });
+        }
+        $("#checkpoint-reveal").focus({ preventScroll: true });
+      });
+    }
+
     sim.subscribe((state, stage, reason) => {
       if (["init", "stage", "restart", "complete"].includes(reason)) renderStage(state, stage);
-      if (reason === "checkpoint") $("#checkpoint").classList.add("active");
+      if (["init", "stage", "phase", "restart", "complete"].includes(reason)) {
+        const phase = phaseFor(sim, stage);
+        const phaseKey = `${state.stageIndex}:${phase.id}`;
+        const isActualTransition = lastPhaseKey !== null && phaseKey !== lastPhaseKey;
+        renderPhase(state, stage, sim, isActualTransition);
+        lastPhaseKey = phaseKey;
+      }
+      if (reason === "checkpoint") surfaceCheckpoint(stage);
       renderPlayback(state, sim);
       if (["init", "dataset"].includes(reason)) renderDataset(state.dataset, reason === "dataset");
       if (["init", "speed"].includes(reason)) $("#speed-value").textContent = `${state.speed}×`;
-      if (["init", "view"].includes(reason)) {
-        $(".stage-wrap").dataset.view = state.view;
-        $$('[data-view]').forEach((button) => {
-          const active = button.dataset.view === state.view;
-          button.classList.toggle("active", active);
-          button.setAttribute("aria-pressed", String(active));
-        });
-      }
+      if (["init", "view"].includes(reason)) renderView(state);
     });
 
     return {
       updateProgress(state) {
-        $("#dwell-bar").style.transform = `scaleX(${Math.min(1, state.progress)})`;
+        const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
+        $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
         $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
       },
     };

@@ -17,6 +17,13 @@
   let dirty = true;
   let last = performance.now();
 
+  canvas.addEventListener("aisaq:asset-ready", () => { dirty = true; });
+  canvas.addEventListener("aisaq:asset-error", () => {
+    fallback.hidden = false;
+    fallback.style.zIndex = "7";
+    fallback.querySelector("p").textContent = "The storage-yard image could not be loaded. Use the synchronized guide to compare the current DiskANN and AiSAQ action.";
+  });
+
   function resize() {
     const rect = wrap.getBoundingClientRect();
     renderer.resize(rect.width, rect.height);
@@ -38,8 +45,7 @@
       ui.updateProgress(simulation.state);
     }
     if (dirty || simulation.state.playing) {
-      renderer.render(simulation.state);
-      dirty = false;
+      dirty = renderer.render(simulation.state);
     }
     requestAnimationFrame(frame);
   }

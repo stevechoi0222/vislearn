@@ -30,7 +30,7 @@ The production site consists of root `index.html`, `css/`, and `js/` files. Node
 
 The primary technical source is:
 
-- Kento Tatsuno, Daisuke Miyashita, Taiga Ikeda, Kiyoshi Ishiyama, Kazunari Sumiyoshi, and Jun Deguchi, ["AiSAQ: All-in-Storage ANNS with Product Quantization for DRAM-free Information Retrieval"](https://arxiv.org/pdf/2404.06004), arXiv:2404.06004v2.
+- Kento Tatsuno, Daisuke Miyashita, Taiga Ikeda, Kiyoshi Ishiyama, Kazunari Sumiyoshi, and Jun Deguchi, ["AiSAQ: All-in-Storage ANNS with Product Quantization for DRAM-free Information Retrieval"](https://arxiv.org/pdf/2404.06004v2), arXiv:2404.06004v2.
 
 Claims tied to the paper are cited in the interface by section, figure, or table. The yard, forklifts, moving query, timing, block shapes, and small example graph are teaching metaphors—not a benchmark trace or a literal rendering of the implementation. Any values marked as illustrative are not paper results. Consult the paper for the algorithm, experimental setup, qualifications, and exact measurements.
 

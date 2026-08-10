@@ -59,15 +59,22 @@
             <option value="KILT E5 22M">KILT E5 · 22.2 million</option>
           </select>
         </label>
-        <a class="paper-link" href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Open paper <span aria-hidden="true">↗</span></a>
+        <a class="paper-link" href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Open paper <span aria-hidden="true">↗</span></a>
       </div>
 
       <div class="sim-grid">
         <div class="stage-wrap">
           <canvas id="yard" aria-hidden="true"></canvas>
           <div class="canvas-fallback" id="canvas-fallback">
-            <p><strong>Visual summary:</strong> DiskANN keeps one PQ code for every dataset vector in DRAM. AiSAQ stores each outgoing neighbor's PQ code in the current node's SSD chunk, uses it for one graph hop, and discards it.</p>
+            <p id="canvas-phase-summary"><strong>Visual summary:</strong> Both systems receive the same query. DiskANN keeps every node's PQ code in DRAM; AiSAQ reads the needed neighbor PQ codes with the current SSD node chunk.</p>
           </div>
+
+          <div class="scene-status" aria-hidden="true">
+            <span id="scene-action-count">Stage 1 · Action 1/1</span>
+            <strong id="scene-action-label">Follow the same query</strong>
+            <small id="scene-shared-cue">Compare where each method gets the data for this action.</small>
+          </div>
+          <p class="sr-only" id="phase-live" role="status" aria-live="polite" aria-atomic="true"></p>
 
           <div class="yard-label yard-label-left" aria-hidden="true">
             <span>DiskANN</span><small>Graph on SSD · all PQ codes in DRAM</small>
@@ -76,7 +83,7 @@
             <span>AiSAQ</span><small>Graph + neighbor PQ codes on SSD</small>
           </div>
 
-          <p class="illustrative-badge">Illustrative 9-node teaching graph · not a benchmark trace</p>
+          <p class="illustrative-badge">Storage-layout schematic · decorative nodes are not the graph topology</p>
 
           <div class="live-ledger" aria-live="polite" aria-atomic="true">
             <div class="ledger-item diskann-ledger">
@@ -87,7 +94,7 @@
             <div class="ledger-item aisaq-ledger">
               <span>AiSAQ peak memory</span>
               <strong id="aisaq-memory">11 MB</strong>
-              <small id="aisaq-codes">≤ 53 PQ codes at once</small>
+              <small id="aisaq-codes">≤ R + n_ep codes · 53 if n_ep = 1</small>
             </div>
             <div class="ledger-item io-ledger">
               <span>Blocks per node chunk</span>
@@ -122,12 +129,34 @@
           <div class="dwell" id="dwell" aria-hidden="true"><i id="dwell-bar"></i></div>
           <div class="guide-body">
             <p id="stage-body"></p>
-            <a id="stage-source" class="source-link" href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Paper §1 <span aria-hidden="true">↗</span></a>
+            <a id="stage-source" class="source-link" href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper §1 <span aria-hidden="true">↗</span></a>
 
-            <div class="truth-note">
-              <strong>What the animation preserves</strong>
-              <p id="truth-copy">The graph topology stays the same. Only the placement and lifetime of PQ codes changes.</p>
-            </div>
+            <section class="action-explanation" aria-labelledby="action-explanation-title">
+              <div class="action-explanation-head">
+                <strong id="action-explanation-title">What is happening now</strong>
+                <span id="guide-action-count">Action 1 of 1</span>
+              </div>
+              <h3 id="guide-action-label">Follow the same query</h3>
+              <dl class="bilateral-rows">
+                <div class="bilateral-row common-row">
+                  <dt>Common action</dt>
+                  <dd id="phase-common">Both methods start from the same query and graph.</dd>
+                </div>
+                <div class="bilateral-row diskann-row" data-method="diskann">
+                  <dt>DiskANN</dt>
+                  <dd id="phase-diskann">It keeps the dataset-wide PQ-code array in DRAM.</dd>
+                </div>
+                <div class="bilateral-row aisaq-row" data-method="aisaq">
+                  <dt>AiSAQ</dt>
+                  <dd id="phase-aisaq">It reads the needed neighbor PQ codes from the SSD node chunk.</dd>
+                </div>
+                <div class="bilateral-row difference-row">
+                  <dt>Why it differs</dt>
+                  <dd id="phase-difference">The search logic is shared; the codes live in a different place.</dd>
+                </div>
+              </dl>
+              <ol class="action-list" id="phase-list" aria-label="Actions in this stage"></ol>
+            </section>
 
             <section class="checkpoint" id="checkpoint" aria-labelledby="checkpoint-title">
               <strong id="checkpoint-title">Pause &amp; check your model</strong>
@@ -151,12 +180,12 @@
     <section class="concept-spine" aria-labelledby="concept-title">
       <div class="section-heading">
         <h2 id="concept-title">The whole paper in one movement</h2>
-        <p>A routing hint changes address. That is enough to change the memory curve, the I/O shape, and how quickly an index can be switched.</p>
+        <p>During index creation, routing hints are preplaced at a different address. That changes the memory curve, the I/O shape, and how quickly an index can be switched.</p>
       </div>
       <div class="spine-flow" aria-label="AiSAQ concept flow">
         <div><span>1</span><strong>Same graph</strong><p>Vamana topology and beam-search decisions stay intact.</p></div>
         <b aria-hidden="true">→</b>
-        <div><span>2</span><strong>Codes move</strong><p>Neighbor PQ codes travel inside the SSD node chunk.</p></div>
+        <div><span>2</span><strong>Codes are preplaced</strong><p>Index creation duplicates outneighbor PQ codes into SSD node chunks.</p></div>
         <b aria-hidden="true">→</b>
         <div><span>3</span><strong>Working set shrinks</strong><p>Use a local batch, score neighbors, then discard it.</p></div>
         <b aria-hidden="true">→</b>
@@ -193,7 +222,7 @@
           </div>
           <div class="block-track" id="diskann-track" aria-label="DiskANN block packing"></div>
           <div class="block-track aisaq-track" id="aisaq-track" aria-label="AiSAQ block packing"></div>
-          <p id="block-verdict" class="block-verdict"><strong>Same I/O count.</strong> The inline PQ codes still fit inside one 4 KB block for SIFT1B.</p>
+          <p id="block-verdict" class="block-verdict"><strong>Same 4 KB block span.</strong> The inline PQ codes still fit inside one 4 KB block for SIFT1B.</p>
         </div>
       </div>
     </section>
@@ -206,7 +235,7 @@
 
       <div class="evidence-layout">
         <figure class="memory-figure">
-          <figcaption>Peak memory during query search · Table 2</figcaption>
+          <figcaption>Peak memory during query search · Table 2 · bar lengths use a log scale</figcaption>
           <div id="memory-bars" class="memory-bars"></div>
         </figure>
         <div class="evidence-table-wrap">
@@ -273,7 +302,7 @@
           <h3>Primary material</h3>
           <ul>
             <li><a href="https://arxiv.org/abs/2404.06004" target="_blank" rel="noreferrer">AiSAQ paper record <span aria-hidden="true">↗</span></a></li>
-            <li><a href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Current v2 PDF <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Current v2 PDF <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/kioxia-jp/aisaq-diskann" target="_blank" rel="noreferrer">Authors’ implementation <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/" target="_blank" rel="noreferrer">Learning-method reference <span aria-hidden="true">↗</span></a></li>
           </ul>
