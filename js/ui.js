@@ -96,6 +96,70 @@
     };
   }
 
+  function hardwareSnapshot(sim) {
+    if (typeof sim.hardwareSnapshot !== "function") return null;
+    try {
+      const snapshot = sim.hardwareSnapshot();
+      return snapshot && typeof snapshot === "object" ? snapshot : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function hardwareCopy(hardware, phase) {
+    const gpuActive = hardware?.gpu?.active === true;
+    if (gpuActive) {
+      const gpuCopy = {
+        "dram-join": [
+          "Operands leave DRAM for PCIe",
+          "Host-prepared scoring operands depart system DRAM. The canonical query q remains host-side; this GPU-assist route is illustrative.",
+        ],
+        "inline-unpack": [
+          "Operands arrive in VRAM from PCIe",
+          "An illustrative operand copy crosses PCIe into VRAM; this transfer is separate from the CPU-based AiSAQ paper path.",
+        ],
+        "pq-score": [
+          "VRAM feeds the GPU scorer",
+          "The GPU scores the illustrative operand copy in VRAM; the evaluated AiSAQ path performs this work on the CPU.",
+        ],
+        "exact-score": [
+          "The GPU computes an illustrative exact score during expansion",
+          "While full vector(p) is active, the illustrative GPU path produces ID(p) plus scalar exact distance; this is not the evaluated AiSAQ path.",
+        ],
+        "queue-commit": [
+          "A scalar result returns to host state",
+          "The GPU-assist route commits only the scalar result to the host-owned candidate or exact-score ledger.",
+        ],
+      };
+      if (gpuCopy[hardware?.beat]) return gpuCopy[hardware.beat];
+    }
+
+    const copy = {
+      inspect: ["See where every byte waits", "The hardware stays fixed while the active addresses and resident buffers are highlighted."],
+      request: ["CPU asks NVMe for node p", "A small command travels toward the SSD. The query q does not travel with it."],
+      "nand-read": ["The SSD gathers node p from NAND", "The controller resolves symbolic LBA(p) and assembles the requested node bytes inside the drive."],
+      "block-return": ["NVMe writes the 4 KiB read into DRAM", "The large data block returns by DMA into reusable host scratch; it does not pass through CPU registers."],
+      "dram-join": ["DiskANN gathers PQ codes from DRAM", "Neighbor IDs from the SSD block address matching entries in the resident global PQ array."],
+      "inline-unpack": ["AiSAQ opens PQ codes inside the returned block", "The neighbor IDs and their inline PQ bytes already meet in reusable DRAM scratch."],
+      "pq-score": ["The CPU turns PQ bytes into scalar distances", "The common lookup table performs the same approximate-distance role for both index layouts."],
+      "exact-score": ["The CPU scores the full vector immediately", "Exact distance is computed during expansion, while the full vector is still in DRAM scratch."],
+      "queue-commit": ["Only an ID and scalar distance remain", "The host candidate or exact-score ledger keeps compact scalar state, not the moving 4 KiB payload."],
+      "scratch-release": ["DRAM scratch becomes empty and reusable", "The host buffer lifetime ends. The SSD copy remains unchanged and is not deleted."],
+      "block-pack": ["Watch the node cross 4 KiB boundaries", "Inline PQ bytes can enlarge an AiSAQ node read by one or more aligned logical units."],
+      evidence: ["Compare the measured system costs", "The paper reports memory and index-load measurements; the 3D hardware route remains a teaching abstraction."],
+    };
+    return copy[hardware?.beat] || [phase?.label || "Follow the active hardware path", phase?.shared || "The current trace event is highlighted in the server cutaway."];
+  }
+
+  function renderHardwareHeadline(sim, phase) {
+    const hardware = hardwareSnapshot(sim);
+    const movement = hardwareCopy(hardware, phase);
+    $("#scene-action-label").textContent = movement[0];
+    $("#scene-shared-cue").textContent = movement[1];
+    $(".stage-wrap").dataset.hardwareBeat = hardware?.beat || "inspect";
+    return hardware;
+  }
+
   function phaseSpan(sim, stage) {
     if (typeof sim.phaseSpan === "function") {
       try {
@@ -170,6 +234,7 @@
 
   function renderTrace(state, stage, sim) {
     const snapshot = traceSnapshot(sim, state, stage);
+    const hardware = hardwareSnapshot(sim);
     const phase = snapshot.phase || phaseFor(sim, stage);
     const events = Array.isArray(snapshot.allEvents)
       ? snapshot.allEvents
@@ -191,17 +256,33 @@
     };
     ["request", "return", "compute"].forEach((bucket) => writeTraceLane(bucket, chooseLaneEvent(events, bucket), fallbacks[bucket]));
 
+    if (hardware?.computePath === "gpu-assist" && hardware?.gpu?.active) {
+      const requestLane = $("#trace-request-lane");
+      const returnLane = $("#trace-return-lane");
+      const computeLane = $("#trace-compute-lane");
+      const storageStatus = state.stageIndex >= 2 ? "completed" : "pending";
+      requestLane.dataset.status = storageStatus;
+      returnLane.dataset.status = storageStatus;
+      computeLane.dataset.status = "current";
+      $("#trace-compute-label").textContent = "GPU assist · illustrative";
+      $("#trace-compute-route").textContent = `${hardware.source} → ${hardware.destination}`;
+      $("#trace-candidate-queue").textContent = hardware.payload;
+    } else {
+      $("#trace-compute-label").textContent = "Compute / commit";
+    }
+
     const current = snapshot.currentEvent || events.find((event) => event.status === "current") || [...events].reverse().find((event) => event.status === "completed") || null;
-    $("#trace-event-id").textContent = current?.id || "not supplied";
+    $("#trace-event-id").textContent = hardware?.gpu?.active ? `gpu-assist/${hardware.beat}` : current?.id || "not supplied";
     $("#trace-event-window").textContent = current && Number.isFinite(Number(current.start)) && Number.isFinite(Number(current.end))
       ? `${Math.round(Number(current.start) * 100)}–${Math.round(Number(current.end) * 100)}% of phase`
       : "phase-relative";
-    $("#trace-fact-status").textContent = current?.factStatus || "illustrative trace";
+    $("#trace-fact-status").textContent = hardware?.gpu?.active ? "illustrative" : current?.factStatus || "illustrative trace";
     const exactEvent = [...events].reverse().find((event) => String(event.payload || "").includes("ID + scalar exact distance"));
     $("#trace-exact-queue").textContent = exactEvent?.payload || "Exact node ID + exact scalar distance (re-rank)";
     $("#dock-phase-label").textContent = snapshot.stateLabel || snapshot.scene?.stateLabel || phase?.label || stage.title;
 
-    const summary = `Visual summary. Stage ${state.stageIndex + 1}, ${phase?.label || stage.title}. ${phase?.shared || stage.summary || "Both methods follow the same graph-search step."} Candidate list L, the seen-ID set, and the exact-score ledger remain separate host-side state.`;
+    const movement = hardwareCopy(hardware, phase);
+    const summary = `Visual summary. Stage ${state.stageIndex + 1}. ${movement[0]}. ${movement[1]} Candidate list L, the seen-ID set, and the exact-score ledger remain separate host-side state.`;
     $("#canvas-phase-summary").textContent = summary;
     $("#yard").setAttribute("aria-label", `${summary} Teaching trace assumes a cache miss; CPU and OS caches are omitted.`);
     return snapshot;
@@ -276,8 +357,7 @@
         : state.stageIndex === 5
           ? "derivation"
           : "evidence";
-    $("#scene-action-label").textContent = phase.label;
-    $("#scene-shared-cue").textContent = phase.shared;
+    renderHardwareHeadline(sim, phase);
     $("#guide-action-count").textContent = actionCount;
     $("#guide-action-label").textContent = phase.label;
     $("#phase-common").textContent = phase.shared;
@@ -298,7 +378,9 @@
     $("#play-label").textContent = label;
     $("#play-icon").textContent = state.playing ? "Ⅱ" : "▶";
     $("#play").setAttribute("aria-label", `${label} simulation`);
-    $("#tour-start").textContent = state.stageIndex === 0 && state.progress < .01 ? "Run trace" : "Run again";
+    const fullRun = $("#tour-start");
+    fullRun.textContent = state.autoTour ? "Running full path" : state.stageIndex === 0 && state.progress < .01 ? "Run full path" : "Run from start";
+    fullRun.setAttribute("aria-pressed", String(Boolean(state.autoTour)));
     const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
     $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
     $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
@@ -510,6 +592,16 @@
     $("#restart").addEventListener("click", () => sim.restart());
     $("#speed").addEventListener("input", (event) => sim.setSpeed(event.target.value));
     $("#dataset-select").addEventListener("change", (event) => sim.setDataset(event.target.value));
+    const computePath = $("#compute-path-select");
+    if (computePath) {
+      computePath.addEventListener("change", (event) => {
+        if (typeof sim.setComputePath === "function") sim.setComputePath(event.target.value);
+        else {
+          sim.state.computePath = event.target.value === "gpu-assist" ? "gpu-assist" : "paper";
+          if (typeof sim.emit === "function") sim.emit("computePath");
+        }
+      });
+    }
     $("#follow").addEventListener("change", (event) => sim.setToggle("follow", event.target.checked));
     $("#labels").addEventListener("change", (event) => sim.setToggle("labels", event.target.checked));
     $("#research-mode").addEventListener("change", (event) => {
@@ -619,6 +711,19 @@
     });
   }
 
+  function renderComputePath(state) {
+    const value = state.computePath === "gpu-assist" ? "gpu-assist" : "paper";
+    document.body.dataset.computePath = value;
+    const select = $("#compute-path-select");
+    if (select && select.value !== value) select.value = value;
+    const note = $("#compute-path-note");
+    if (note) {
+      note.textContent = value === "gpu-assist"
+        ? "Illustrative accelerator path: DRAM → PCIe → VRAM → GPU → host result. This is not the evaluated AiSAQ path."
+        : "Paper path: NVMe returns the read into system DRAM and the CPU performs the evaluated search work; GPU stays off-path.";
+    }
+  }
+
   function bindAiSAQUI(sim) {
     initRoute(sim);
     initEvidence();
@@ -649,7 +754,7 @@
 
     sim.subscribe((state, stage, reason) => {
       const stageChanged = lastStageIndex === null || lastStageIndex !== state.stageIndex;
-      if (stageChanged || ["init", "stage", "restart", "complete"].includes(reason)) renderStage(state, stage);
+      if (stageChanged || ["init", "stage", "restart", "runAll", "complete"].includes(reason)) renderStage(state, stage);
       const phase = phaseFor(sim, stage);
       const phaseKey = `${state.stageIndex}:${phase.id}`;
       const isActualTransition = lastPhaseKey !== null && phaseKey !== lastPhaseKey;
@@ -662,6 +767,7 @@
       if (["init", "dataset"].includes(reason)) renderDataset(state.dataset, reason === "dataset");
       if (["init", "speed"].includes(reason)) $("#speed-value").textContent = `${state.speed}×`;
       if (["init", "view"].includes(reason)) renderView(state);
+      if (["init", "computePath"].includes(reason)) renderComputePath(state);
     });
 
     return {
@@ -669,6 +775,7 @@
         const actionProgress = typeof sim.phaseProgress === "function" ? sim.phaseProgress() : state.progress;
         $("#dwell-bar").style.transform = `scaleX(${Math.min(1, actionProgress)})`;
         $("#tour-progress").style.transform = `scaleX(${Math.min(1, sim.overallProgress())})`;
+        renderHardwareHeadline(sim, phaseFor(sim, sim.stage || content.stages[state.stageIndex]));
         renderTrace(state, sim.stage || content.stages[state.stageIndex], sim);
       },
     };

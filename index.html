@@ -4,18 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="theme-color" content="#071014">
-  <meta name="description" content="Watch one DiskANN and AiSAQ graph-search hop move through SSD, DRAM, CPU scoring, and the candidate queue—block by block.">
+  <meta name="description" content="Fly through a transparent server cutaway and watch one DiskANN or AiSAQ graph-search hop cross CPU, DRAM, PCIe, NVMe, SSD, and the candidate queue.">
   <title>Byte Transit Observatory — DiskANN vs AiSAQ</title>
-  <link rel="stylesheet" href="css/styles.css?v=observatory-20260810a">
+  <link rel="stylesheet" href="css/styles.css?v=observatory-20260810b">
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142a37'/%3E%3Cpath d='M13 18h38v28H13z' fill='%234aaE9b'/%3E%3Cpath d='M18 23h9v8h-9zm0 12h9v6h-9zm13-12h15v8H31zm0 12h15v6H31z' fill='%23f5c84c'/%3E%3C/svg%3E">
 </head>
 <body data-detail="beginner">
   <!--
-  THESIS: Make data placement physically inspectable: one graph hop becomes a synchronized byte trace through SSD, transient DRAM, CPU, and an ID-plus-distance queue.
-  OWN-WORLD: A dark systems observatory with a dominant orthographic cutaway, directional trace lanes, paper-white annotations, and fixed colors for SSD, DRAM, CPU work, and payload fields.
-  STORY: Watch the block move, pause at any instant, inspect what survives each boundary, then verify the paper-backed tradeoff below.
-  FIRST VIEWPORT: Canvas owns the viewport; a slim trace ledger overlays left, a collapsible learning inspector sits right, and a scrub-capable transport dock anchors the bottom.
-  FORM: Byte Transit Observatory, selected direction 1; visual-first access trace with beginner-first copy and opt-in research fields.
+  THESIS: Make the physical machine legible first: one graph hop travels through a transparent server cutaway before any explanatory dashboard asks for attention.
+  OWN-WORLD: A guided fly-through of CPU, DRAM, GPU/VRAM, PCIe, NVMe, and SSD, with method identity kept separate from memory-tier colors.
+  STORY: Follow one cache-miss request down and its 4 KiB logical aligned data units up, then compare DiskANN's global DRAM PQ gather with AiSAQ's inline PQ path.
+  FIRST VIEWPORT: Canvas owns at least three quarters of the view; one live movement sentence sits left, a current-event Transit HUD ghosts inactive lanes, a thin inspector peeks right, and seven stages plus playback run along the bottom.
+  FORM: Byte Transit Observatory · seed a644c789 · transparent server cutaway / guided fly-through · beginner-first copy with opt-in research fields.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
   <a class="skip-link" href="#trace-ledger">Skip to the live trace</a>
@@ -31,6 +31,13 @@
       <span>PHASE <strong id="hud-action">1 / 4</strong></span>
       <span class="hud-mode">TRACE <strong id="hud-query">index inspection</strong></span>
     </div>
+    <label class="compute-path-field" for="compute-path-select">
+      <span>Compute path</span>
+      <select id="compute-path-select" aria-describedby="compute-path-scope compute-path-note">
+        <option value="paper" selected>Paper path · CPU</option>
+        <option value="gpu-assist">GPU assist · illustrative</option>
+      </select>
+    </label>
     <nav class="topnav" aria-label="Page sections">
       <a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Paper</a>
       <a href="#sources">About &amp; accuracy</a>
@@ -51,11 +58,11 @@
 
       <div class="sim-grid">
         <div class="stage-wrap">
-          <canvas id="yard" role="img" aria-label="Animated cutaway of DiskANN and AiSAQ moving one graph-search hop through SSD, DRAM, CPU, and a candidate queue" aria-describedby="canvas-phase-summary">
+          <canvas id="yard" role="img" aria-label="Guided three-dimensional transparent server cutaway showing one DiskANN or AiSAQ graph-search hop crossing CPU, DRAM, PCIe, NVMe, and SSD; an optional GPU and VRAM path is explicitly illustrative" aria-describedby="canvas-phase-summary compute-path-scope">
             Your browser does not support Canvas. The live text trace below describes the same memory movement.
           </canvas>
           <div class="canvas-fallback" id="canvas-fallback">
-            <p id="canvas-phase-summary"><strong>Visual summary:</strong> Both methods follow the same graph-search step. DiskANN joins neighbor IDs from SSD with PQ codes resident in DRAM; AiSAQ uses neighbor PQ codes already stored inside the SSD node chunk.</p>
+            <p id="canvas-phase-summary"><strong>Visual summary:</strong> The query and lookup table remain host-side. A cache-miss request travels down through PCIe and NVMe; 4 KiB logical aligned units return to reusable DRAM scratch. DiskANN gathers global PQ codes from DRAM, while AiSAQ reads inline neighbor PQ codes from SSD. Exact scalar distance is recorded during expansion.</p>
           </div>
 
           <div class="scene-status" aria-hidden="true">
@@ -66,10 +73,12 @@
           <p class="sr-only" id="phase-live" role="status" aria-live="polite" aria-atomic="true"></p>
 
           <div class="scope-badge" aria-label="Paper and visualization scope">
-            <strong>arXiv v2 scope</strong>
-            <span>Evaluated full-inline AiSAQ layout</span>
-            <small>Teaching trace assumes a node-cache miss; cache-hit paths are omitted.</small>
+            <strong>Paper scope</strong>
+            <span>arXiv v2 · evaluated full-inline layout · cache-miss trace</span>
+            <small>q and LUT stay host-side; cache-hit paths are omitted.</small>
           </div>
+          <p class="compute-path-scope" id="compute-path-scope">AiSAQ paper path is CPU-based; GPU assist is a separate illustrative system path.</p>
+          <p class="sr-only" id="compute-path-note" role="status" aria-live="polite">Paper path: NVMe returns the read into system DRAM and the CPU performs the evaluated search work; GPU stays off-path.</p>
 
           <div class="camera-controls" aria-label="Observatory camera controls">
             <button id="camera-in" type="button" aria-label="Zoom in" title="Zoom in">+</button>
@@ -81,11 +90,12 @@
             <span><i class="diskann-key"></i>DRAM · resident or temporary</span>
             <span><i class="aisaq-key"></i>SSD · stored node chunk</span>
             <span><i class="query-key"></i>CPU work · active payload</span>
+            <span><i class="gpu-key"></i>GPU / VRAM · illustrative only</span>
           </div>
 
-          <section class="trace-ledger" id="trace-ledger" aria-labelledby="trace-ledger-title" aria-live="polite" aria-atomic="true">
+          <section class="trace-ledger" id="trace-ledger" aria-labelledby="trace-ledger-title">
             <header>
-              <div><span>LIVE ACCESS TRACE</span><strong id="trace-ledger-title">Where the bytes are now</strong></div>
+              <div><span>TRANSIT HUD · CURRENT EVENT</span><strong id="trace-ledger-title">Where the bytes are now</strong></div>
               <output id="trace-progress" for="trace-scrubber">0%</output>
             </header>
             <ol class="trace-lanes">
@@ -112,6 +122,9 @@
         </div>
 
         <div class="transport" aria-label="Simulation trace controls">
+          <nav class="stage-rail" aria-label="Seven-stage guided fly-through">
+            <ol class="route-list" id="route-list" aria-label="Learning stages"></ol>
+          </nav>
           <div class="query-plate">
             <span>ACTIVE TRACE</span><strong id="dock-phase-label">PAPER 2404.06004</strong>
           </div>
@@ -130,7 +143,7 @@
             <input id="trace-scrubber" type="range" min="0" max="1000" step="1" value="0" aria-label="Scrub within the current phase">
           </label>
           <div class="tour-progress" aria-hidden="true"><i id="tour-progress"></i></div>
-          <div class="mode-switch" role="group" aria-label="View mode">
+          <div class="mode-switch" role="group" aria-label="Method view: DiskANN, AiSAQ, or both">
             <button type="button" data-view="split" class="active" aria-pressed="true">Both</button>
             <button type="button" data-view="diskann" aria-pressed="false">DiskANN</button>
             <button type="button" data-view="aisaq" aria-pressed="false">AiSAQ</button>
@@ -209,8 +222,6 @@
                 <small id="checkpoint-hint"></small>
               </div>
             </section>
-
-            <ol class="route-list" id="route-list" aria-label="Learning stops"></ol>
           </div>
         </aside>
       </div>
@@ -344,6 +355,8 @@
             <li><a href="https://arxiv.org/pdf/2404.06004v2" target="_blank" rel="noreferrer">Scoped v2 PDF <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/kioxia-jp/aisaq-diskann" target="_blank" rel="noreferrer">Authors’ implementation <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/kioxia-jp/aisaq-diskann/blob/a9898254452c03626a56452735155ccf1909d30c/src/pq_flash_index.cpp#L1463-L1684" target="_blank" rel="noreferrer">Paper-era search hot path <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://nvmexpress.org/base-nvm-express-part-one/" target="_blank" rel="noreferrer">NVMe host queues, system DRAM, and PCIe reference <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://docs.nvidia.com/gpudirect-storage/overview-guide/index.html" target="_blank" rel="noreferrer">Traditional DRAM bounce and direct storage-to-GPU distinction <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/" target="_blank" rel="noreferrer">Learning-method reference <span aria-hidden="true">↗</span></a></li>
             <li><a href="https://github.com/LaurentiuGabriel/rocket-engine" target="_blank" rel="noreferrer">Canvas-interaction reference <span aria-hidden="true">↗</span></a></li>
           </ul>
@@ -368,11 +381,12 @@
     <p><a href="#top">Back to the observatory ↑</a></p>
   </footer>
 
-  <script src="js/content.js?v=observatory-20260810a"></script>
-  <script src="js/iso.js?v=observatory-20260810a"></script>
-  <script src="js/sim.js?v=observatory-20260810a"></script>
-  <script src="js/render.js?v=observatory-20260810a"></script>
-  <script src="js/ui.js?v=observatory-20260810a"></script>
-  <script src="js/main.js?v=observatory-20260810a"></script>
+  <script src="js/content.js?v=observatory-20260810b"></script>
+  <script src="js/iso.js?v=observatory-20260810b"></script>
+  <script src="js/sim.js?v=observatory-20260810b"></script>
+  <script src="js/render.js?v=observatory-20260810b"></script>
+  <script src="js/ui.js?v=observatory-20260810b"></script>
+  <script src="js/hardware3d.js?v=observatory-20260810b"></script>
+  <script src="js/main.js?v=observatory-20260810b"></script>
 </body>
 </html>

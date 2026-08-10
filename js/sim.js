@@ -2,6 +2,30 @@
   "use strict";
 
   const EPSILON = 1e-8;
+  const HARDWARE_BEATS = new Set([
+    "inspect", "request", "nand-read", "block-return", "dram-join", "inline-unpack",
+    "pq-score", "exact-score", "queue-commit", "scratch-release", "block-pack", "evidence",
+  ]);
+  const CAMERA_BY_BEAT = {
+    inspect: "overview",
+    request: "ssd-controller",
+    "nand-read": "ssd-nand",
+    "block-return": "dram-scratch",
+    "dram-join": "dram-pq-array",
+    "inline-unpack": "dram-scratch",
+    "pq-score": "cpu-lut",
+    "exact-score": "cpu-exact",
+    "queue-commit": "host-queues",
+    "scratch-release": "dram-scratch",
+    "block-pack": "ssd-blocks",
+    evidence: "evidence-panel",
+  };
+  const GPU_ROUTE = [
+    { beat: "dram-join", source: "host.dram", destination: "host.pcie", cameraTarget: "pcie", payload: "host-prepared scoring operands; canonical q remains host-resident" },
+    { beat: "inline-unpack", source: "host.pcie", destination: "gpu.vram", cameraTarget: "gpu-vram", payload: "illustrative operand transfer into VRAM; not a paper event" },
+    { beat: "pq-score", source: "gpu.vram", destination: "gpu.compute", cameraTarget: "gpu-compute", payload: "illustrative GPU-assisted scoring over host-prepared operands" },
+    { beat: "queue-commit", source: "gpu.compute", destination: "host.result", cameraTarget: "host-result", payload: "scalar result returns to host-owned search state" },
+  ];
 
   class AiSAQSimulation {
     constructor(stages) {
@@ -17,6 +41,8 @@
         follow: true,
         labels: true,
         dataset: "SIFT1B",
+        computePath: "paper",
+        autoTour: false,
         elapsed: 0,
         checkpointPaused: false,
       };
@@ -163,6 +189,166 @@
       };
     }
 
+    _safeHardwareText(value) {
+      return String(value || "")
+        .replace(/\bLBA\s*(?:[=:#]\s*|\s+)\d+\b/gi, "LBA(p)")
+        .replace(/\brequest(?:\s+id)?\s*(?:[=:#]\s*|\s+)\d+\b/gi, "request");
+    }
+
+    _hardwareMethod(event) {
+      if (event && ["diskann", "aisaq"].includes(event.lane)) return event.lane;
+      const path = `${event && event.source || ""} ${event && event.destination || ""}`.toLowerCase();
+      const diskann = path.includes("diskann");
+      const aisaq = path.includes("aisaq");
+      if (diskann !== aisaq) return diskann ? "diskann" : "aisaq";
+      return "both";
+    }
+
+    _hardwareBeat(event, snapshot) {
+      const phase = snapshot.phase || {};
+      const scene = snapshot.sceneFamily;
+      const eventProgress = event ? Math.max(0, Math.min(1, Number(event.progress) || 0)) : snapshot.phaseProgress;
+      const text = `${event && event.id || ""} ${event && event.label || ""} ${event && event.source || ""} ${event && event.destination || ""} ${event && event.payload || ""}`.toLowerCase();
+      if (scene === "pack") return { beat: "block-pack", progress: eventProgress };
+      if (scene === "evidence") return { beat: "evidence", progress: eventProgress };
+      if (scene === "layout") return { beat: "inspect", progress: eventProgress };
+      if (/release.*scratch|scratch.*release|scratch-pool|scratch capacity reusable|reuse scratch/.test(text)) {
+        return { beat: "scratch-release", progress: eventProgress };
+      }
+      if (event && event.direction === "down") {
+        const split = 0.58;
+        return eventProgress < split
+          ? { beat: "request", progress: eventProgress / split }
+          : { beat: "nand-read", progress: (eventProgress - split) / (1 - split) };
+      }
+      if (event && event.direction === "up" && /(ssd|lba\(p\)|nand)/.test(text) && /scratch/.test(text)) {
+        return { beat: "block-return", progress: eventProgress };
+      }
+      if (/cache[- ]miss/.test(text)) return { beat: "request", progress: eventProgress };
+      if (/inline|scratch\.inline-pq|co-located/.test(text) && !/compute pq|scalar approximate/.test(text)) {
+        return { beat: "inline-unpack", progress: eventProgress };
+      }
+      if (/dram\.pq-array|gather|join id|matching global pq/.test(text) && !/compute pq|scalar approximate/.test(text)) {
+        return { beat: "dram-join", progress: eventProgress };
+      }
+      if (/candidate-list|seen-ids|exact-score-ledger|exact-sorter|host\.results|host\.result|commit|prune|merge|return top|select top k/.test(text)) {
+        return { beat: "queue-commit", progress: eventProgress };
+      }
+      if (/cpu\.exact|compute exact|full vector\(p\).*scalar exact|q × full vector/.test(text)) {
+        return { beat: "exact-score", progress: eventProgress };
+      }
+      if (/cpu\.lut|pq distance|pq-distance|approximate score|scalar approximate|centroid lookup|score entrypoint/.test(text)) {
+        return { beat: "pq-score", progress: eventProgress };
+      }
+      const fallback = event
+        ? "inspect"
+        : scene === "score"
+          ? "pq-score"
+          : scene === "commit"
+            ? (phase.id === "record-current-vector" ? "exact-score" : "queue-commit")
+            : scene === "read" && phase.id === "dispatch-read"
+              ? "request"
+              : "inspect";
+      return { beat: fallback, progress: eventProgress };
+    }
+
+    _gpuHardwareSnapshot(snapshot) {
+      const scaled = Math.max(0, Math.min(1, snapshot.phaseProgress)) * GPU_ROUTE.length;
+      const index = Math.min(GPU_ROUTE.length - 1, Math.floor(scaled));
+      const route = GPU_ROUTE[index];
+      const progress = snapshot.phaseProgress >= 1 - EPSILON ? 1 : scaled - index;
+      const exact = snapshot.phase && snapshot.phase.id === "record-current-vector";
+      return {
+        beat: index === 2 && exact ? "exact-score" : route.beat,
+        method: "both",
+        source: route.source,
+        destination: route.destination,
+        payload: index === 2 && exact
+          ? "illustrative GPU-assisted exact scoring over host-prepared operands during expansion; canonical q remains host-resident"
+          : route.payload,
+        progress,
+        phaseProgress: snapshot.phaseProgress,
+        cameraTarget: route.cameraTarget,
+        factStatus: "illustrative",
+        cacheMiss: false,
+        computePath: "gpu-assist",
+        queryResidency: "host",
+        gpu: {
+          active: true,
+          reason: "illustrative opt-in; not in evaluated AiSAQ query path",
+          hop: index,
+          route: ["host.dram", "host.pcie", "gpu.vram", "gpu.compute", "host.result"],
+        },
+      };
+    }
+
+    hardwareSnapshot() {
+      const snapshot = this.traceSnapshot();
+      const event = snapshot.currentEvent
+        || snapshot.completedEvents[snapshot.completedEvents.length - 1]
+        || snapshot.events[0]
+        || null;
+      const inferred = this._hardwareBeat(event, snapshot);
+      const method = this._hardwareMethod(event);
+      const prefix = method === "both" ? "shared" : method;
+      let source = this._safeHardwareText(event && event.source || "host.trace");
+      let destination = this._safeHardwareText(event && event.destination || "host.trace");
+      let payload = this._safeHardwareText(event && event.payload || snapshot.stateLabel || "Inspect trace state");
+      if (inferred.beat === "request") {
+        source = /request-queue/.test(source) ? source : (method === "both" ? "host.request-queue" : `${prefix}.host.request-queue`);
+        destination = /(ssd|lba\(p\))/.test(destination.toLowerCase()) ? destination : `${prefix}.ssd.controller`;
+        payload = `${payload}; aligned logical node read travels down toward symbolic LBA(p); q remains host-side`;
+      } else if (inferred.beat === "nand-read") {
+        source = `${prefix}.ssd.controller`;
+        destination = `${prefix}.ssd.nand`;
+        payload = "read the node-chunk bytes addressed by symbolic LBA(p); q remains host-side";
+      } else if (inferred.beat === "block-return") {
+        source = /(ssd|lba\(p\)|nand)/.test(source.toLowerCase()) ? source : `${prefix}.ssd.nand`;
+        destination = /scratch/.test(destination.toLowerCase()) ? destination : `${prefix}.dram.scratch`;
+        payload = `${payload}; aligned 4 KiB unit(s) travel up into reusable DRAM scratch`;
+      } else if (inferred.beat === "exact-score") {
+        payload = `${payload}; exact distance is computed during expansion and only ID + scalar exact distance is retained`;
+      } else if (inferred.beat === "scratch-release") {
+        destination = "host.scratch-pool";
+        payload = "release reusable scratch capacity after exact scoring; the SSD index copy is unchanged and is not deleted";
+      }
+      if (/host\.query/i.test(source) && /(ssd|nand|lba\(p\))/i.test(destination)) {
+        source = method === "both" ? "host.request-queue" : `${prefix}.host.request-queue`;
+        payload = `${payload}; canonical q remains at host.query and is not transported`;
+      }
+      if (!HARDWARE_BEATS.has(inferred.beat)) inferred.beat = "inspect";
+      const cacheMiss = inferred.beat === "request" || inferred.beat === "nand-read" || inferred.beat === "block-return" || /cache[- ]miss/.test(`${payload} ${event && event.label || ""}`.toLowerCase());
+      const paper = {
+        beat: inferred.beat,
+        method,
+        source,
+        destination,
+        payload,
+        progress: Math.max(0, Math.min(1, inferred.progress)),
+        phaseProgress: snapshot.phaseProgress,
+        cameraTarget: CAMERA_BY_BEAT[inferred.beat] || "overview",
+        factStatus: event && event.factStatus || "illustrative",
+        cacheMiss,
+        computePath: "paper",
+        queryResidency: "host",
+        gpu: {
+          active: false,
+          reason: "not in evaluated AiSAQ query path",
+        },
+      };
+      if (this.state.computePath !== "gpu-assist") return paper;
+      const gpuPhase = snapshot.phase && ["seed-entrypoint", "compute-pq-distance", "record-current-vector"].includes(snapshot.phase.id);
+      if (gpuPhase) return this._gpuHardwareSnapshot(snapshot);
+      return Object.assign({}, paper, {
+        computePath: "gpu-assist",
+        gpu: {
+          active: false,
+          reason: "armed; current storage or host beat remains on the paper hardware path",
+          route: ["host.dram", "host.pcie", "gpu.vram", "gpu.compute", "host.result"],
+        },
+      });
+    }
+
     subscribe(listener) {
       this.listeners.add(listener);
       listener(this.state, this.stage, "init");
@@ -195,9 +381,19 @@
       if (phaseAfter !== phaseBefore) this.emit("phase");
 
       if (state.progress >= 1 - EPSILON) {
+        if (state.autoTour && state.stageIndex < this.stages.length - 1) {
+          this.checkedStages.add(state.stageIndex);
+          state.stageIndex += 1;
+          state.progress = 0;
+          state.checkpointPaused = false;
+          state.playing = true;
+          this.emit("stage");
+          return true;
+        }
         state.progress = 1;
         state.playing = false;
         state.checkpointPaused = true;
+        state.autoTour = false;
         this.checkedStages.add(state.stageIndex);
         this.emit("checkpoint");
       }
@@ -206,6 +402,7 @@
 
     playPause() {
       const state = this.state;
+      state.autoTour = false;
       if (state.progress >= 1 - EPSILON) {
         if (state.stageIndex < this.stages.length - 1) {
           this.resume();
@@ -223,6 +420,7 @@
 
     next() {
       const state = this.state;
+      state.autoTour = false;
       const timeline = this._timeline();
       const index = this.phaseIndex();
       state.playing = false;
@@ -249,6 +447,7 @@
 
     previous() {
       const state = this.state;
+      state.autoTour = false;
       const timeline = this._timeline();
       const index = this.phaseIndex();
       state.playing = false;
@@ -279,6 +478,7 @@
     }
 
     goTo(index) {
+      this.state.autoTour = false;
       const numeric = Number(index);
       const requested = Number.isFinite(numeric) ? Math.trunc(numeric) : 0;
       const next = Math.max(0, Math.min(this.stages.length - 1, requested));
@@ -292,6 +492,7 @@
 
     goToPhase(stageIndex, phaseIndex) {
       const state = this.state;
+      state.autoTour = false;
       const oldStageIndex = state.stageIndex;
       const oldPhaseIndex = this.phaseIndex();
       const numericStage = Number(stageIndex);
@@ -316,6 +517,7 @@
 
     setProgress(value) {
       const numeric = Number(value);
+      this.state.autoTour = false;
       this.state.progress = Math.max(0, Math.min(1, Number.isFinite(numeric) ? numeric : 0));
       this.state.elapsed = 0;
       this.state.playing = false;
@@ -328,6 +530,7 @@
 
     replayPhase() {
       const span = this.phaseSpan();
+      this.state.autoTour = false;
       this.state.progress = span.start;
       this.state.elapsed = 0;
       this.state.checkpointPaused = false;
@@ -337,10 +540,23 @@
       return this.traceSnapshot();
     }
 
+    runAll() {
+      this.state.stageIndex = 0;
+      this.state.progress = 0;
+      this.state.elapsed = 0;
+      this.state.checkpointPaused = false;
+      this.state.autoTour = true;
+      this.state.playing = true;
+      this.checkedStages.clear();
+      this.emit("runAll");
+      return this.traceSnapshot();
+    }
+
     restart() {
       this.state.stageIndex = 0;
       this.state.progress = 0;
       this.state.elapsed = 0;
+      this.state.autoTour = false;
       this.state.playing = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
       this.state.checkpointPaused = false;
       this.checkedStages.clear();
@@ -378,6 +594,13 @@
       if (!["split", "diskann", "aisaq"].includes(value)) return;
       this.state.view = value;
       this.emit("view");
+    }
+
+    setComputePath(value) {
+      if (!["paper", "gpu-assist"].includes(value)) return;
+      this.state.computePath = value;
+      this.emit("computePath");
+      return this.hardwareSnapshot();
     }
 
     setDataset(value) {
