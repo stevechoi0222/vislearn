@@ -44,7 +44,8 @@ localRefs.forEach((value) => {
 
 const yardTag = html.match(/<canvas\b[^>]*\bid=["']yard["'][^>]*>/i)?.[0] || "";
 const decorativeCanvas = /aria-hidden=["']true["']/i.test(yardTag);
-const describedCanvas = /role=["']img["']/i.test(yardTag) && /aria-describedby=["']canvas-phase-summary["']/i.test(yardTag);
+const describedCanvas = /role=["']img["']/i.test(yardTag)
+  && /aria-describedby=["'][^"']*\bcanvas-phase-summary\b[^"']*["']/i.test(yardTag);
 check(decorativeCanvas || describedCanvas, "Canvas must be hidden or linked to its semantic trace description");
 check(/\bid=["']phase-live["'][^>]*aria-live=["']polite["']/i.test(html), "Missing polite phase live region");
 check(/arXiv v2/i.test(html), "Missing visible arXiv v2 scope disclosure");

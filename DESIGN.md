@@ -15,6 +15,7 @@ colors:
   tier-dram: "#5a82ef"
   tier-ssd: "#35c8b0"
   tier-cpu: "#f5c84c"
+  tier-gpu: "#936de8"
   full-vector: "#ec7c68"
   id-field: "#d8e1de"
   caveat: "#d85d49"
@@ -95,13 +96,13 @@ components:
 
 **Creative North Star: "The Byte Transit Observatory"**
 
-The first viewport behaves like a systems instrument, not a conventional hero. A dark Canvas cutaway exposes two synchronized method lanes and shared CPU, DRAM, and SSD tiers. A slim semantic ledger names the current request, return, or compute event; the inspector and dock recede until the learner asks for explanation or control.
+The first viewport behaves like a systems instrument, not a conventional hero. A dark, transparent 3D server cutaway exposes two synchronized method lanes and shared CPU, host DRAM, PCIe/NVMe, SSD controller, and NAND hardware. Optional GPU/VRAM boards face inward toward the lanes but remain dim and off-path in the default paper view. A slim semantic ledger names the current request, return, or compute event; the inspector and dock recede until the learner asks for explanation or control.
 
-The visual system is precise rather than photorealistic: hard planes, compact data labels, directional arrows, symbolic addresses, and restrained highlights. The Canvas carries the mechanism; DOM overlays carry accessibility, paper scope, and exact state.
+The visual system is precise rather than photorealistic: hard planes, compact data labels, directional arrows, symbolic addresses, and restrained highlights. The 3D renderer carries the mechanism; DOM overlays carry accessibility, paper scope, and exact state.
 
 **Key Characteristics:**
 
-- Canvas-dominant first viewport with synchronized semantic trace.
+- WebGL-first 3D viewport with synchronized semantic trace and an automatic 2D Canvas fallback.
 - Two fixed method lanes over common memory-tier geometry.
 - Beginner explanation first; research fields appear only on request.
 - Paper-backed, derived, and illustrative information remain distinguishable.
@@ -121,6 +122,7 @@ The observatory uses dark blue-black surfaces under low ambient light; semantic 
 
 - **Comparison Cobalt** (`#4f7fe8`) and **Comparison Mint** (`#55c7ad`): supporting comparison accents in controls and editorial evidence.
 - **Full Vector Coral** (`#ec7c68`): full-vector payload and exact-score path.
+- **Illustrative GPU Purple** (`#936de8`): the optional GPU/VRAM compute route only; never a paper-backed tier claim.
 - **ID Field** (`#d8e1de`): degree and neighbor-ID fields.
 - **Caveat Coral** (`#d85d49`): limits, costs, and incorrect recall feedback.
 
@@ -131,7 +133,7 @@ The observatory uses dark blue-black surfaces under low ambient light; semantic 
 - **Drafting Paper** (`#f4f0e7`), **Concrete** (`#e4dfd3`), and **Warm White** (`#fffdf7`): learning sections and evidence.
 - **Freight Ink** (`#142a37`), **Muted Copy** (`#58707a`), and **Steel** (`#84a0aa`): editorial text and dividers.
 
-**The Tier Color Rule.** Yellow means CPU/active work, periwinkle means DRAM, teal means SSD, and coral means full-vector exact work or caveat depending on context.
+**The Tier Color Rule.** Yellow means CPU/active work, periwinkle means DRAM, teal means SSD, coral means full-vector exact work or caveat depending on context, and purple is reserved for the opt-in illustrative GPU/VRAM route.
 
 **The Method Identity Rule.** DiskANN and AiSAQ are identified by fixed lane, name, and marker shape. Never rely on a memory-tier color to identify a method.
 
@@ -157,22 +159,22 @@ Condensed type behaves like equipment labeling and section signage. The body sta
 
 ## Layout
 
-The first viewport fills `100svh`. At wide desktop, the Canvas occupies the field behind a 58px top bar, a trace ledger capped near 310px at upper left, a 300–338px right inspector, and a 108px bottom dock that expands when the inspector closes. A compact scene title and paper-scope badge sit over unused Canvas space rather than consuming rows.
+The first viewport fills `100svh`. At wide desktop, the renderer occupies the field behind a 58px top bar, a compact transit HUD at upper left, a narrow right inspector, and a 128px bottom dock. A compact scene title and paper-scope badge sit over unused 3D space rather than consuming rows.
 
-The cutaway maintains two method lanes while applying the same CPU, DRAM, and SSD tier structure to both. Seven learning stages change the active event family without replacing the spatial model.
+The cutaway maintains two method lanes while applying the same CPU, DRAM, PCIe/NVMe, controller, and NAND structure to both. GPU boards are mirrored inward so VRAM and compute remain visible within the chassis framing. Seven learning stages and 12 hardware beats change the active payload, route, component glow, and guided camera target without replacing the spatial model.
 
-At 1180px and 900px, low-priority dock and HUD controls disappear before the trace or Canvas is reduced. At 760px and below, the top bar becomes two rows, the inspector defaults to a 44px bottom-sheet peek, the dock becomes a compact 148px stack, and primary controls keep 44px targets. Research detail remains opt-in. Editorial sections stack without horizontal scrolling.
+At 1180px and 900px, low-priority dock and HUD controls disappear before the hardware view is reduced. At 760px and below, the top bar becomes two rows, the inspector defaults to a 44px bottom-sheet peek, and the dock becomes a 208px stack. The Run Full Path action remains visible and primary controls keep 44px targets. Research detail remains opt-in. Editorial sections stack without horizontal scrolling.
 
 ## Elevation & Depth
 
-Depth comes from Canvas tier planes, one-pixel boundaries, darker raised surfaces, and blunt offset shadows. Soft shadows separate the inspector and dock from moving geometry; glow is limited to an active payload or query signal.
+Depth comes from transparent chassis shells, modeled boards and packages, perspective, fog, directional light, one-pixel DOM boundaries, and darker raised surfaces. Soft shadows separate the inspector and dock from moving geometry; glow is limited to an active payload, component, or query signal.
 
 ### Shadow Vocabulary
 
 - **Ledger Offset** (`8px 10px 0 rgba(0,0,0,.2)`): makes the semantic trace read as a fixed instrument.
 - **Inspector Lift** (`0 18px 46px rgba(0,0,0,.38)`): separates explanation from the cutaway.
 - **Dock Lift** (`0 16px 34px rgba(0,0,0,.38)`): anchors transport controls.
-- **Control Offset** (`4px 5px 0 #71550a`): gives the primary Run Trace action tactile weight.
+- **Control Offset** (`4px 5px 0 #71550a`): gives the primary Run Full Path action tactile weight.
 
 **The Instrument Plane Rule.** Use borders and tonal planes first; reserve a shadow for an overlay that must remain legible over the Canvas.
 
@@ -182,13 +184,17 @@ The observatory is rectilinear. Ledger lanes, panels, tier boxes, aligned read u
 
 ## Components
 
-### Observatory Canvas
+### Observatory Renderer
 
-The signature Canvas shows three separate host records—candidate list `L`, seen IDs, and the exact-score ledger—beside CPU scoring, reusable DRAM scratch, and aligned SSD units in paired method lanes. Query `q` and LUT state stay host-side. Request arrows travel down; returned read units travel up; scoring and commit movement is lateral. Numeric addresses are never synthesized.
+The primary Three.js renderer shows three separate host records—candidate list `L`, seen IDs, and the exact-score ledger—beside CPU scoring, reusable DRAM scratch, PCIe/NVMe, SSD controller/NAND, and aligned read units in paired method lanes. Query `q` and LUT state stay host-side. Request pulses travel down; NAND voxels assemble the return; 4 KiB units travel up into scratch; scoring and commit movement is lateral. Numeric addresses are never synthesized. If the runtime Three.js import or WebGL initialization fails, the local 2D Canvas renderer preserves the teaching trace.
+
+The 12 renderer beats are: inspect, request, NAND read, block return, DRAM join, inline unpack, PQ score, exact score, queue commit, scratch release, block pack, and evidence. Follow mode selects beat-specific component framing. Manual pointer orbit, zoom, or fit disengages follow; labels remain independently toggleable.
+
+The default compute route is the CPU path described by the paper/public implementation. GPU assist is opt-in and illustrative: host-prepared scoring operands branch through PCIe into VRAM/GPU and a scalar result returns to host-owned state. It does not turn the query into an SSD payload or replace the NVMe request, NAND read, and DRAM return beats.
 
 ### Trace Ledger
 
-Three ordered lanes report Request/Address, Data Return, and Compute/Commit. Pending, current, and completed opacity mirrors `traceSnapshot()`. Research mode adds event ID, phase window, evidence status, and the exact-record description.
+Three ordered lanes report Request/Address, Data Return, and Compute/Commit. Pending, current, and completed opacity mirrors `traceSnapshot()`. Research mode adds event ID, phase window, evidence status, and the exact-record description. This visible ledger is not an ARIA live region because its values change every animation frame; `#phase-live` alone announces discrete phase and checkpoint transitions.
 
 ### Learning Inspector
 
@@ -196,7 +202,7 @@ The narrow right inspector begins with plain-language stage purpose, then bilate
 
 ### Transport Dock
 
-Run Trace, Previous, Play/Pause, Next, Replay Phase, phase scrubber, and overall progress are primary. View, dataset, speed, follow, labels, restart, and Research detail remain available as space permits. Native range and checkbox controls preserve keyboard behavior.
+Run Full Path, Previous, Play/Pause, Next, Replay Phase, phase scrubber, and overall progress are primary. View, compute path, dataset, speed, follow, labels, restart, camera orbit/zoom/fit, and Research detail remain available as space permits. Native range, select, and checkbox controls preserve keyboard behavior. The mobile 208px dock retains Run Full Path instead of hiding it.
 
 ### Scope Badge
 
@@ -214,6 +220,7 @@ The block lab, evidence bars/table, tradeoff balance, recall form, and source le
 - **Do** keep `q`, centroids, and LUT state host-side.
 - **Do** show logical aligned requests down and 4 KiB read units up into reusable scratch for the modeled cache miss.
 - **Do** show DiskANN gathering global DRAM PQ codes and AiSAQ consuming inline PQ codes from its returned chunk.
+- **Do** default to CPU compute and label every active GPU/VRAM route illustrative.
 - **Do** label `L` as `ID + scalar PQ distance + expansion state`, keep seen IDs separate, and label implementation exact-score records `ID + scalar exact distance`.
 - **Do** preserve semantic text, visible focus, reduced motion, and 44px mobile controls.
 
@@ -222,6 +229,7 @@ The block lab, evidence bars/table, tradeoff balance, recall form, and source le
 - **Don't** depict PQ bytes migrating between methods at query time.
 - **Don't** send query `q` to SSD or imply the LUT lives in the node chunk.
 - **Don't** use DRAM blue or SSD teal as a method identity.
+- **Don't** imply the optional GPU branch was evaluated by the AiSAQ paper or public implementation.
 - **Don't** invent numeric LBAs, request IDs, latency coordinates, or benchmark results.
 - **Don't** imply cache behavior, production telemetry, physical-device proof, deployment, or benchmark reproduction that was not established.
 - **Don't** let overlays crowd out the byte path or make Research detail the beginner default.
