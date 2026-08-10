@@ -1,0 +1,222 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-10T01:33:11Z",
+  "title": "Design System: AiSAQ Storage Yard",
+  "extensions": {
+    "colorMeta": {
+      "ink": {
+        "role": "neutral",
+        "displayName": "Freight Ink",
+        "canonical": "#142a37",
+        "tonalRamp": ["oklch(15% 0.035 235)", "oklch(25% 0.035 235)", "oklch(35% 0.035 235)", "oklch(47% 0.035 235)", "oklch(59% 0.035 235)", "oklch(71% 0.035 235)", "oklch(83% 0.035 235)", "oklch(95% 0.035 235)"]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Raised Ink",
+        "canonical": "#213c4a",
+        "tonalRamp": ["oklch(15% 0.035 225)", "oklch(25% 0.035 225)", "oklch(35% 0.035 225)", "oklch(47% 0.035 225)", "oklch(59% 0.035 225)", "oklch(71% 0.035 225)", "oklch(83% 0.035 225)", "oklch(95% 0.035 225)"]
+      },
+      "paper": {
+        "role": "neutral",
+        "displayName": "Drafting Paper",
+        "canonical": "#f4f0e7",
+        "tonalRamp": ["oklch(15% 0.015 85)", "oklch(25% 0.015 85)", "oklch(35% 0.015 85)", "oklch(47% 0.015 85)", "oklch(59% 0.015 85)", "oklch(71% 0.015 85)", "oklch(83% 0.015 85)", "oklch(95% 0.015 85)"]
+      },
+      "concrete": {
+        "role": "neutral",
+        "displayName": "Yard Concrete",
+        "canonical": "#e4dfd3",
+        "tonalRamp": ["oklch(15% 0.015 80)", "oklch(25% 0.015 80)", "oklch(35% 0.015 80)", "oklch(47% 0.015 80)", "oklch(59% 0.015 80)", "oklch(71% 0.015 80)", "oklch(83% 0.015 80)", "oklch(95% 0.015 80)"]
+      },
+      "warm-white": {
+        "role": "neutral",
+        "displayName": "Warm Evidence White",
+        "canonical": "#fffdf7",
+        "tonalRamp": ["oklch(15% 0.008 90)", "oklch(25% 0.008 90)", "oklch(35% 0.008 90)", "oklch(47% 0.008 90)", "oklch(59% 0.008 90)", "oklch(71% 0.008 90)", "oklch(83% 0.008 90)", "oklch(95% 0.008 90)"]
+      },
+      "cobalt": {
+        "role": "secondary",
+        "displayName": "DRAM Cobalt",
+        "canonical": "#3168d8",
+        "tonalRamp": ["oklch(15% 0.16 260)", "oklch(25% 0.16 260)", "oklch(35% 0.16 260)", "oklch(47% 0.16 260)", "oklch(59% 0.16 260)", "oklch(71% 0.16 260)", "oklch(83% 0.16 260)", "oklch(95% 0.16 260)"]
+      },
+      "cobalt-deep": {
+        "role": "secondary",
+        "displayName": "Warehouse Cobalt",
+        "canonical": "#1c4da8",
+        "tonalRamp": ["oklch(15% 0.14 260)", "oklch(25% 0.14 260)", "oklch(35% 0.14 260)", "oklch(47% 0.14 260)", "oklch(59% 0.14 260)", "oklch(71% 0.14 260)", "oklch(83% 0.14 260)", "oklch(95% 0.14 260)"]
+      },
+      "mint": {
+        "role": "tertiary",
+        "displayName": "SSD Mint",
+        "canonical": "#4aae9b",
+        "tonalRamp": ["oklch(15% 0.09 175)", "oklch(25% 0.09 175)", "oklch(35% 0.09 175)", "oklch(47% 0.09 175)", "oklch(59% 0.09 175)", "oklch(71% 0.09 175)", "oklch(83% 0.09 175)", "oklch(95% 0.09 175)"]
+      },
+      "mint-deep": {
+        "role": "tertiary",
+        "displayName": "Deep SSD Mint",
+        "canonical": "#247666",
+        "tonalRamp": ["oklch(15% 0.075 175)", "oklch(25% 0.075 175)", "oklch(35% 0.075 175)", "oklch(47% 0.075 175)", "oklch(59% 0.075 175)", "oklch(71% 0.075 175)", "oklch(83% 0.075 175)", "oklch(95% 0.075 175)"]
+      },
+      "signal-yellow": {
+        "role": "primary",
+        "displayName": "Signal Cargo Yellow",
+        "canonical": "#f5c84c",
+        "tonalRamp": ["oklch(15% 0.14 85)", "oklch(25% 0.14 85)", "oklch(35% 0.14 85)", "oklch(47% 0.14 85)", "oklch(59% 0.14 85)", "oklch(71% 0.14 85)", "oklch(83% 0.14 85)", "oklch(95% 0.14 85)"]
+      },
+      "signal-yellow-deep": {
+        "role": "primary",
+        "displayName": "Deep Signal Ochre",
+        "canonical": "#b98706",
+        "tonalRamp": ["oklch(15% 0.13 78)", "oklch(25% 0.13 78)", "oklch(35% 0.13 78)", "oklch(47% 0.13 78)", "oklch(59% 0.13 78)", "oklch(71% 0.13 78)", "oklch(83% 0.13 78)", "oklch(95% 0.13 78)"]
+      },
+      "coral": {
+        "role": "tertiary",
+        "displayName": "Tradeoff Coral",
+        "canonical": "#d85d49",
+        "tonalRamp": ["oklch(15% 0.13 30)", "oklch(25% 0.13 30)", "oklch(35% 0.13 30)", "oklch(47% 0.13 30)", "oklch(59% 0.13 30)", "oklch(71% 0.13 30)", "oklch(83% 0.13 30)", "oklch(95% 0.13 30)"]
+      },
+      "muted": {
+        "role": "neutral",
+        "displayName": "Muted Steel Copy",
+        "canonical": "#58707a",
+        "tonalRamp": ["oklch(15% 0.025 220)", "oklch(25% 0.025 220)", "oklch(35% 0.025 220)", "oklch(47% 0.025 220)", "oklch(59% 0.025 220)", "oklch(71% 0.025 220)", "oklch(83% 0.025 220)", "oklch(95% 0.025 220)"]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Survey Line",
+        "canonical": "#b8b6ae",
+        "tonalRamp": ["oklch(15% 0.008 80)", "oklch(25% 0.008 80)", "oklch(35% 0.008 80)", "oklch(47% 0.008 80)", "oklch(59% 0.008 80)", "oklch(71% 0.008 80)", "oklch(83% 0.008 80)", "oklch(95% 0.008 80)"]
+      }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Industrial Display", "purpose": "Major editorial section landmarks." },
+      "headline": { "displayName": "Panel Headline", "purpose": "Current simulation stop and compact panel headlines." },
+      "title": { "displayName": "Local Title", "purpose": "Balance panels and local content groups." },
+      "body": { "displayName": "Explanatory Body", "purpose": "Mechanism explanations and evidence context up to 68ch." },
+      "label": { "displayName": "Operational Label", "purpose": "Controls, presets, and compact state language." },
+      "data": { "displayName": "Address Data", "purpose": "Measurements, stages, outputs, and tabular values." }
+    },
+    "shadows": [
+      { "name": "utility-rail", "value": "0 7px 16px rgba(20, 42, 55, .25)", "purpose": "Separate sticky navigation from the working surface." },
+      { "name": "ambient-panel", "value": "0 18px 36px rgba(20, 42, 55, .18)", "purpose": "Lift mobile navigation and exceptional overlays." },
+      { "name": "yard-label-offset", "value": "5px 7px 0 rgba(20, 42, 55, .18)", "purpose": "Give Canvas placards a printed physical character." },
+      { "name": "ledger-offset", "value": "7px 9px 0 rgba(20, 42, 55, .18)", "purpose": "Anchor the live ledger over the yard." },
+      { "name": "control-lift", "value": "0 5px 10px rgba(0, 0, 0, .18)", "purpose": "Give transport controls restrained tactility." },
+      { "name": "balance-mass", "value": "10px 13px 0 rgba(20, 42, 55, .14)", "purpose": "Support the deliberate weight metaphor in the tradeoff section." }
+    ],
+    "motion": [
+      { "name": "progress-linear", "value": "transform .1s linear", "purpose": "Update guide and route progress without layout-changing width animation." },
+      { "name": "simulation-clock", "value": "requestAnimationFrame; 50–75s per stage at 1x; 0.5x–3x", "purpose": "Move one synchronized query through both yard layouts." },
+      { "name": "checkpoint-pause", "value": "pause once at 58% of each stage", "purpose": "Interrupt passive viewing with a learner-controlled recall checkpoint." },
+      { "name": "reduced-motion", "value": ".001ms CSS durations; autoplay disabled", "purpose": "Keep the full explanation operable without ambient movement." }
+    ],
+    "breakpoints": [
+      { "name": "stack-guide", "value": "1100px" },
+      { "name": "mobile", "value": "760px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Transport Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The current play or pause action in the simulation dock.",
+      "html": "<button class=\"ds-control-primary\" type=\"button\"><span aria-hidden=\"true\">Ⅱ</span><span>Pause</span></button>",
+      "css": ".ds-control-primary { min-height: 42px; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; color: var(--ink, #142a37); background: var(--yellow, #f5c84c); border: 1px solid var(--yellow-deep, #b98706); border-radius: 10px; font: 750 .75rem/1.55 var(--font, sans-serif); cursor: pointer; box-shadow: 0 5px 10px rgba(0,0,0,.18); } .ds-control-primary:hover { transform: translateY(-1px); } .ds-control-primary:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Transport Secondary Button",
+      "kind": "button",
+      "description": "A tactile dark control for next and restart actions.",
+      "html": "<button class=\"ds-control-secondary\" type=\"button\"><span aria-hidden=\"true\">↦</span><span>Next</span></button>",
+      "css": ".ds-control-secondary { min-height: 42px; display: inline-flex; align-items: center; gap: 7px; padding: 7px 12px; color: #e4edef; background: #203b49; border: 1px solid #405965; border-radius: 10px; font: 750 .75rem/1.55 var(--font, sans-serif); cursor: pointer; box-shadow: 0 5px 10px rgba(0,0,0,.18); } .ds-control-secondary:hover { transform: translateY(-1px); } .ds-control-secondary:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Dataset Select",
+      "kind": "input",
+      "description": "A compact dark selector used on the simulation utility rail.",
+      "html": "<label class=\"ds-dataset\"><span>Dataset preset</span><select><option>SIFT1B · 1 billion</option><option>SIFT1M · 1 million</option></select></label>",
+      "css": ".ds-dataset { display: flex; align-items: center; gap: 9px; color: #c8d4d8; font: 750 .78rem/1.55 var(--font, sans-serif); } .ds-dataset select { min-height: 34px; padding: 4px 30px 4px 10px; color: var(--white, #fffdf7); background: #10242e; border: 1px solid #526872; border-radius: 8px; font: inherit; } .ds-dataset select:hover { border-color: #78909a; } .ds-dataset select:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Selected Toggle Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "A compact persistent simulation toggle in its selected state.",
+      "html": "<label class=\"ds-toggle\"><input type=\"checkbox\" checked><span>Follow query</span></label>",
+      "css": ".ds-toggle { position: relative; display: inline-block; cursor: pointer; font: 700 .68rem/1.55 var(--font, sans-serif); } .ds-toggle input { position: absolute; opacity: 0; pointer-events: none; } .ds-toggle span { display: block; padding: 7px 9px; color: #aebdc2; background: #1c3542; border: 1px solid #3d5662; border-radius: 7px; } .ds-toggle input:checked + span { color: var(--ink, #142a37); background: var(--mint, #4aae9b); border-color: #83d5c5; } .ds-toggle:hover span { border-color: #83d5c5; } .ds-toggle input:focus-visible + span { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Route Stop",
+      "kind": "custom",
+      "description": "A jump target for one of the seven learning stages.",
+      "html": "<button class=\"ds-route-stop\" type=\"button\" aria-current=\"step\"><span>3</span><strong>Fetch the node chunk</strong></button>",
+      "css": ".ds-route-stop { width: 100%; display: grid; grid-template-columns: 25px 1fr; gap: 10px; align-items: center; padding: 9px 10px; text-align: left; color: var(--ink, #142a37); background: #fff4c4; border: 0; font: 400 1rem/1.55 var(--font, sans-serif); cursor: pointer; } .ds-route-stop > span { width: 23px; height: 23px; display: grid; place-items: center; color: var(--ink, #142a37); background: var(--yellow, #f5c84c); border-radius: 50%; font: 700 .65rem/1 var(--data, monospace); } .ds-route-stop strong { font-size: .78rem; } .ds-route-stop:hover { background: #ffed99; } .ds-route-stop:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Truth Note",
+      "kind": "card",
+      "description": "A mint evidence boundary that states which property the animation preserves.",
+      "html": "<aside class=\"ds-truth-note\"><strong>What the animation preserves</strong><p>The graph topology stays the same. Only the placement and lifetime of PQ codes changes.</p></aside>",
+      "css": ".ds-truth-note { max-width: 34rem; padding: 16px 24px 17px; color: var(--ink, #142a37); background: #e1f1ec; border-top: 1px solid #a7c7be; border-bottom: 1px solid #a7c7be; font: 400 .82rem/1.55 var(--font, sans-serif); } .ds-truth-note strong { display: block; margin-bottom: 4px; color: var(--mint-deep, #247666); font-size: .73rem; text-transform: uppercase; } .ds-truth-note p { margin: 0; }"
+    },
+    {
+      "name": "Learning Checkpoint",
+      "kind": "card",
+      "description": "A warm recall interruption with reveal and explicit continuation actions.",
+      "html": "<section class=\"ds-checkpoint\"><strong>Pause &amp; check your model</strong><p>Where are the neighbor PQ codes right now?</p><div><button type=\"button\">Reveal answer</button><button type=\"button\">Continue tour</button></div></section>",
+      "css": ".ds-checkpoint { max-width: 30rem; padding: 16px; color: var(--ink, #142a37); background: #fff4c4; border-top: 2px solid var(--yellow-deep, #b98706); font: 400 .8rem/1.55 var(--font, sans-serif); } .ds-checkpoint > strong { display: block; font: 700 .9rem/1.2 var(--display, sans-serif); text-transform: uppercase; } .ds-checkpoint > p { margin: 6px 0 12px; color: #3b4e55; } .ds-checkpoint div { display: flex; flex-wrap: wrap; gap: 7px; } .ds-checkpoint button { min-height: 34px; padding: 6px 9px; color: var(--ink, #142a37); background: var(--white, #fffdf7); border: 1px solid #9f8a42; border-radius: 7px; font-weight: 800; cursor: pointer; } .ds-checkpoint button:last-child { color: var(--white, #fffdf7); background: var(--ink, #142a37); border-color: var(--ink, #142a37); } .ds-checkpoint button:hover { transform: translateY(-1px); } .ds-checkpoint button:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Quiz Option",
+      "kind": "input",
+      "description": "A full-surface radio answer that carries selected, correct, and incorrect feedback.",
+      "html": "<label class=\"ds-quiz-option\"><input type=\"radio\" name=\"answer\" checked><span>The codes move into each SSD node chunk.</span></label>",
+      "css": ".ds-quiz-option { position: relative; display: block; max-width: 28rem; font: 400 .88rem/1.55 var(--font, sans-serif); } .ds-quiz-option input { position: absolute; opacity: 0; } .ds-quiz-option span { min-height: 48px; display: flex; align-items: center; padding: 12px 14px; color: #d8e3e5; background: #183541; border: 1px solid #5d7780; cursor: pointer; } .ds-quiz-option input:checked + span { color: var(--ink, #142a37); background: var(--yellow, #f5c84c); border-color: var(--yellow, #f5c84c); } .ds-quiz-option:hover span { border-color: var(--yellow, #f5c84c); } .ds-quiz-option input:focus-visible + span { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    },
+    {
+      "name": "Top Navigation Rail",
+      "kind": "nav",
+      "refersTo": "navigation-rail",
+      "description": "The sticky ink utility rail that anchors brand, thesis, and learning links.",
+      "html": "<nav class=\"ds-topnav\" aria-label=\"Page sections\"><strong>AiSAQ</strong><span>Move the codes. <b>Keep the graph.</b></span><a href=\"#evidence\">Evidence</a><a href=\"#sources\">Sources</a></nav>",
+      "css": ".ds-topnav { min-height: 64px; display: flex; align-items: center; gap: 24px; padding: 0 24px; color: var(--white, #fffdf7); background: var(--ink, #142a37); box-shadow: 0 7px 16px rgba(20,42,55,.25); font: 400 .86rem/1.55 var(--font, sans-serif); } .ds-topnav > strong { font: 850 1.25rem/1 var(--display, sans-serif); } .ds-topnav > span { margin-right: auto; padding-left: 22px; border-left: 1px solid #60717a; } .ds-topnav b { color: var(--yellow, #f5c84c); } .ds-topnav a { padding: 9px 11px; color: #e3ebec; font-weight: 650; text-decoration: none; } .ds-topnav a:hover { color: var(--yellow, #f5c84c); } .ds-topnav a:focus-visible { outline: 3px solid var(--yellow, #f5c84c); outline-offset: 3px; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Addressable Storage Yard",
+    "overview": "The Addressable Storage Yard treats memory placement as an industrial logistics problem. A synchronized isometric yard gives every abstract systems concept a persistent physical role: cobalt DRAM warehouses, mint SSD plots, signal-yellow PQ cargo, a yellow query vehicle, and 4 KB address markings. The same query crosses the same visible graph in both halves, so the visual world reinforces the paper's central distinction instead of merely decorating it.\n\nMatte paper and concrete surfaces keep dense evidence readable, while the ink utility rail, condensed headings, mono data labels, and offset structural shadows make the experience feel like a precise operating console. The mood is tactile, industrious, and explanatory. It rejects glossy dashboard polish, ornamental gradients, photorealism, and motion that cannot be stopped.",
+    "keyCharacteristics": [
+      "Synchronized low-poly comparison with a persistent yellow query vehicle.",
+      "Semantic cargo colors that retain one meaning across Canvas, controls, evidence, and feedback.",
+      "Condensed industrial headlines paired with calm body copy and tabular mono data.",
+      "Matte surfaces, visible edges, and structural offset shadows instead of glossy depth.",
+      "Explicit paper evidence, checkpoints, and reduced-motion behavior integrated into the visual system."
+    ],
+    "rules": [
+      { "name": "The Cargo Color Rule", "body": "Signal Cargo Yellow always means query movement, PQ cargo, active progress, selection, or focus; it is not a decorative wash.", "section": "colors" },
+      { "name": "The Fixed Address Rule", "body": "Cobalt remains DiskANN and DRAM, mint remains AiSAQ and SSD, and coral remains cost or error across every medium.", "section": "colors" },
+      { "name": "The Condensed Infrastructure Rule", "body": "Use condensed type for landmarks and large values, not for paragraphs; long explanations stay in the body stack.", "section": "typography" },
+      { "name": "The Numbers Are Cargo Rule", "body": "Measurements use the mono stack and tabular numerals so changing values do not jitter or lose alignment.", "section": "typography" },
+      { "name": "The Same Route Rule", "body": "Comparison layouts must preserve simultaneous graph geometry and route progress; responsive reflow may change framing but never imply two different searches.", "section": "layout" },
+      { "name": "The Matte Massing Rule", "body": "Convey hierarchy with planes, edges, and purposeful offset shadows; do not introduce blur-heavy glass, glow, or decorative gradient depth.", "section": "elevation" },
+      { "name": "The No Bubble Panels Rule", "body": "Round the control in the hand, not the industrial surface it operates.", "section": "shapes" }
+    ],
+    "dos": [
+      "Do preserve one semantic color mapping across Canvas objects, controls, charts, feedback, and prose.",
+      "Do keep the same graph and query route visibly synchronized whenever DiskANN and AiSAQ are compared.",
+      "Do use condensed display type for landmarks, body type for explanations, and mono type for data.",
+      "Do label illustrative geometry and keep measured evidence visually distinct from derived or simplified material.",
+      "Do preserve visible focus, semantic fallback text, keyboard operation, mobile touch targets, and reduced-motion behavior.",
+      "Do use matte planes, hard edges, and structural shadows to maintain the low-poly industrial world."
+    ],
+    "donts": [
+      "Don't use Signal Cargo Yellow as an arbitrary decorative accent or assign cobalt, mint, and coral new meanings.",
+      "Don't replace the split-yard mechanism with generic cards, a prose-only hero, or two unsynchronized diagrams.",
+      "Don't introduce ornamental gradients, glossy glass panels, photorealistic assets, or soft bubble-card styling.",
+      "Don't hide source boundaries or style an illustrative animation as if it were benchmark telemetry.",
+      "Don't make motion mandatory, remove learner controls, or let decorative Canvas labels collide on narrow screens."
+    ]
+  }
+}

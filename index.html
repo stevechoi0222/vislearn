@@ -1,0 +1,308 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#142a37">
+  <meta name="description" content="A guided, interactive explanation of AiSAQ: how moving product-quantized vectors from DRAM into SSD node chunks changes memory, I/O, and index switching.">
+  <title>AiSAQ Storage Yard — Learn the paper visually</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='12' fill='%23142a37'/%3E%3Cpath d='M13 18h38v28H13z' fill='%234aaE9b'/%3E%3Cpath d='M18 23h9v8h-9zm0 12h9v6h-9zm13-12h15v8H31zm0 12h15v6H31z' fill='%23f5c84c'/%3E%3C/svg%3E">
+</head>
+<body>
+  <!--
+  THESIS: AiSAQ is a data-placement change, not a new graph; the same query crosses the same graph while PQ codes move from a scale-bound DRAM warehouse into SSD node chunks.
+  OWN-WORLD: A matte isometric storage yard on 4 KB address plots, with cobalt DRAM, mint SSD, signal-yellow PQ cargo, ink control rails, and paper evidence ledgers.
+  STORY: Follow one query hop, compare both layouts, test block packing, inspect paper evidence, and recall the tradeoff.
+  FIRST VIEWPORT: A split storage yard dominates; a synchronized guide sits right and playback controls span the bottom.
+  FORM: User-pinned low-poly learning simulation fused with a memory-allocation atlas; seed e1cadee4; split-yard staging with a guided route.
+  FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
+  -->
+  <a class="skip-link" href="#learning-guide">Skip to the learning guide</a>
+
+  <header class="topbar">
+    <a class="brand" href="#top" aria-label="AiSAQ Storage Yard home">
+      <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>AiSAQ</span>
+    </a>
+    <p class="thesis">Move the codes. <strong>Keep the graph.</strong></p>
+    <nav class="topnav" aria-label="Page sections">
+      <a href="#block-lab">Block lab</a>
+      <a href="#evidence">Evidence</a>
+      <a href="#quiz">Recall test</a>
+      <a href="#sources">Sources</a>
+    </nav>
+    <button class="plain-button top-menu" id="top-menu" type="button" aria-expanded="false" aria-controls="mobile-nav">
+      <span class="sr-only">Toggle navigation</span>
+      <span aria-hidden="true">Menu</span>
+    </button>
+  </header>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile page sections" hidden>
+    <a href="#block-lab">Block lab</a><a href="#evidence">Evidence</a><a href="#quiz">Recall test</a><a href="#sources">Sources</a>
+  </nav>
+
+  <main id="top">
+    <section class="sim-shell" aria-labelledby="sim-heading">
+      <h1 id="sim-heading" class="sr-only">AiSAQ and DiskANN interactive storage-layout comparison</h1>
+
+      <div class="sim-toolbar" aria-label="Simulation settings">
+        <div class="mode-switch" role="group" aria-label="View mode">
+          <button type="button" data-view="split" class="active" aria-pressed="true">Compare</button>
+          <button type="button" data-view="diskann" aria-pressed="false">DiskANN</button>
+          <button type="button" data-view="aisaq" aria-pressed="false">AiSAQ</button>
+        </div>
+        <label class="dataset-field">
+          <span>Dataset preset</span>
+          <select id="dataset-select" aria-label="Dataset preset">
+            <option value="SIFT1B">SIFT1B · 1 billion</option>
+            <option value="SIFT1M">SIFT1M · 1 million</option>
+            <option value="KILT E5 22M">KILT E5 · 22.2 million</option>
+          </select>
+        </label>
+        <a class="paper-link" href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Open paper <span aria-hidden="true">↗</span></a>
+      </div>
+
+      <div class="sim-grid">
+        <div class="stage-wrap">
+          <canvas id="yard" aria-hidden="true"></canvas>
+          <div class="canvas-fallback" id="canvas-fallback">
+            <p><strong>Visual summary:</strong> DiskANN keeps one PQ code for every dataset vector in DRAM. AiSAQ stores each outgoing neighbor's PQ code in the current node's SSD chunk, uses it for one graph hop, and discards it.</p>
+          </div>
+
+          <div class="yard-label yard-label-left" aria-hidden="true">
+            <span>DiskANN</span><small>Graph on SSD · all PQ codes in DRAM</small>
+          </div>
+          <div class="yard-label yard-label-right" aria-hidden="true">
+            <span>AiSAQ</span><small>Graph + neighbor PQ codes on SSD</small>
+          </div>
+
+          <p class="illustrative-badge">Illustrative 9-node teaching graph · not a benchmark trace</p>
+
+          <div class="live-ledger" aria-live="polite" aria-atomic="true">
+            <div class="ledger-item diskann-ledger">
+              <span>DiskANN peak memory</span>
+              <strong id="diskann-memory">31,303 MB</strong>
+              <small id="diskann-codes">1,000,000,000 PQ codes resident</small>
+            </div>
+            <div class="ledger-item aisaq-ledger">
+              <span>AiSAQ peak memory</span>
+              <strong id="aisaq-memory">11 MB</strong>
+              <small id="aisaq-codes">≤ 53 PQ codes at once</small>
+            </div>
+            <div class="ledger-item io-ledger">
+              <span>Blocks per node chunk</span>
+              <strong id="block-count">1 → 1</strong>
+              <small>DiskANN → AiSAQ · derived</small>
+            </div>
+          </div>
+        </div>
+
+        <div class="transport" aria-label="Simulation controls">
+          <div class="transport-actions">
+            <button class="control-button primary" id="play" type="button" aria-label="Pause simulation" title="Play or pause (Space)">
+              <span id="play-icon" aria-hidden="true">Ⅱ</span><span class="control-label" id="play-label">Pause</span>
+            </button>
+            <button class="control-button" id="next" type="button" title="Next stop (Right arrow)"><span aria-hidden="true">↦</span><span class="control-label">Next</span></button>
+            <button class="control-button" id="restart" type="button" title="Restart (R)"><span aria-hidden="true">↺</span><span class="control-label">Restart</span></button>
+          </div>
+          <div class="tour-progress" aria-label="Tour progress"><i id="tour-progress"></i></div>
+          <label class="speed-field"><span>Speed <strong id="speed-value">1×</strong></span><input id="speed" type="range" min="0.5" max="3" step="0.5" value="1"></label>
+          <div class="transport-toggles">
+            <label><input id="follow" type="checkbox" checked><span>Follow query</span></label>
+            <label><input id="labels" type="checkbox" checked><span>Labels</span></label>
+          </div>
+        </div>
+
+        <aside class="learning-guide" id="learning-guide" aria-labelledby="stage-title">
+          <div class="guide-head">
+            <div class="stage-meta"><span id="stage-count">Stop 1 of 7</span><span id="stage-source-short">Paper §1</span></div>
+            <h2 id="stage-title">The memory wall</h2>
+            <p id="stage-short">A billion tiny routing hints become a very large DRAM commitment.</p>
+          </div>
+          <div class="dwell" id="dwell" aria-hidden="true"><i id="dwell-bar"></i></div>
+          <div class="guide-body">
+            <p id="stage-body"></p>
+            <a id="stage-source" class="source-link" href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Paper §1 <span aria-hidden="true">↗</span></a>
+
+            <div class="truth-note">
+              <strong>What the animation preserves</strong>
+              <p id="truth-copy">The graph topology stays the same. Only the placement and lifetime of PQ codes changes.</p>
+            </div>
+
+            <section class="checkpoint" id="checkpoint" aria-labelledby="checkpoint-title">
+              <strong id="checkpoint-title">Pause &amp; check your model</strong>
+              <p id="checkpoint-prompt"></p>
+              <div class="checkpoint-actions">
+                <button type="button" id="checkpoint-reveal">Reveal answer</button>
+                <button type="button" id="checkpoint-continue">Continue tour</button>
+              </div>
+              <div id="checkpoint-answer" class="checkpoint-answer" hidden>
+                <p id="checkpoint-reveal-copy"></p>
+                <small id="checkpoint-hint"></small>
+              </div>
+            </section>
+
+            <ol class="route-list" id="route-list" aria-label="Learning stops"></ol>
+          </div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="concept-spine" aria-labelledby="concept-title">
+      <div class="section-heading">
+        <h2 id="concept-title">The whole paper in one movement</h2>
+        <p>A routing hint changes address. That is enough to change the memory curve, the I/O shape, and how quickly an index can be switched.</p>
+      </div>
+      <div class="spine-flow" aria-label="AiSAQ concept flow">
+        <div><span>1</span><strong>Same graph</strong><p>Vamana topology and beam-search decisions stay intact.</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>2</span><strong>Codes move</strong><p>Neighbor PQ codes travel inside the SSD node chunk.</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>3</span><strong>Working set shrinks</strong><p>Use a local batch, score neighbors, then discard it.</p></div>
+        <b aria-hidden="true">→</b>
+        <div><span>4</span><strong>I/O becomes the lever</strong><p>Chunk packing across 4 KB blocks is one latency lever.</p></div>
+      </div>
+    </section>
+
+    <section class="block-lab" id="block-lab" aria-labelledby="block-title">
+      <div class="section-heading">
+        <h2 id="block-title">Pack the node chunk</h2>
+        <p>AiSAQ pays for its tiny DRAM footprint by duplicating neighbor PQ codes on SSD. The practical question is whether those extra bytes cross another 4 KB block boundary.</p>
+      </div>
+
+      <div class="lab-layout">
+        <form class="lab-controls" id="lab-form">
+          <fieldset>
+            <legend>Paper presets</legend>
+            <div class="preset-row" role="group" aria-label="Block lab presets">
+              <button type="button" data-preset="SIFT1M">SIFT1M</button>
+              <button type="button" data-preset="SIFT1B" class="active">SIFT1B</button>
+              <button type="button" data-preset="KILT E5 22M">KILT E5 22M</button>
+            </div>
+          </fieldset>
+          <label><span>Full-vector bytes <output id="full-bytes-output">128</output></span><input id="full-bytes" type="range" min="128" max="4096" step="128" value="128"></label>
+          <label><span>Maximum outdegree R <output id="degree-output">52</output></span><input id="degree" type="range" min="16" max="96" step="1" value="52"></label>
+          <label><span>PQ bytes per vector <output id="pq-bytes-output">32</output></span><input id="pq-bytes" type="range" min="16" max="256" step="16" value="32"></label>
+          <p class="formula-note">Assumes 4-byte IDs and 4 KB blocks. Preset values come from Table 1; chunk sizes and block counts are formula-derived.</p>
+        </form>
+
+        <div class="block-visual" aria-live="polite">
+          <div class="chunk-result">
+            <div><span>DiskANN chunk</span><strong id="diskann-chunk">340 B</strong><small id="diskann-blocks">1 block</small></div>
+            <div><span>AiSAQ chunk</span><strong id="aisaq-chunk">2,004 B</strong><small id="aisaq-blocks">1 block</small></div>
+          </div>
+          <div class="block-track" id="diskann-track" aria-label="DiskANN block packing"></div>
+          <div class="block-track aisaq-track" id="aisaq-track" aria-label="AiSAQ block packing"></div>
+          <p id="block-verdict" class="block-verdict"><strong>Same I/O count.</strong> The inline PQ codes still fit inside one 4 KB block for SIFT1B.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="evidence" id="evidence" aria-labelledby="evidence-title">
+      <div class="section-heading">
+        <h2 id="evidence-title">What the paper actually measured</h2>
+        <p>The headline is supported by three datasets under matched construction and search conditions. These are reported results, not a reproduction by this site.</p>
+      </div>
+
+      <div class="evidence-layout">
+        <figure class="memory-figure">
+          <figcaption>Peak memory during query search · Table 2</figcaption>
+          <div id="memory-bars" class="memory-bars"></div>
+        </figure>
+        <div class="evidence-table-wrap">
+          <table>
+            <caption>Index load time · Table 3</caption>
+            <thead><tr><th>Dataset</th><th>DiskANN</th><th>AiSAQ</th></tr></thead>
+            <tbody id="load-time-body"></tbody>
+          </table>
+          <p class="measurement-note">Memory was measured with <code>/usr/bin/time</code> over ten queries without ground-truth data. Exact latency-plot coordinates were not published, so this site does not fabricate them.</p>
+        </div>
+      </div>
+
+      <div class="switch-strip">
+        <div><span>KILT subset switch</span><strong>119.2 ms</strong><small>DiskANN</small></div>
+        <div aria-hidden="true">→</div>
+        <div><span>Reload centroids</span><strong>1.9 ms</strong><small>AiSAQ</small></div>
+        <div aria-hidden="true">→</div>
+        <div><span>Share centroids</span><strong>0.3 ms</strong><small>AiSAQ · only when codebooks match</small></div>
+      </div>
+    </section>
+
+    <section class="tradeoff" aria-labelledby="tradeoff-title">
+      <div class="section-heading">
+        <h2 id="tradeoff-title">“DRAM-free” has an asterisk</h2>
+        <p>The strong claim is dataset-size-independent PQ working memory—not literal zero RAM and not free storage.</p>
+      </div>
+      <div class="balance-beam" aria-label="AiSAQ tradeoffs">
+        <div class="benefit-side">
+          <h3>What gets lighter</h3>
+          <ul>
+            <li>Measured process memory: 11–14 MB</li>
+            <li>Index load time: 0.6–2.0 ms in the single-server tests</li>
+            <li>Switching between indices that share PQ centroids</li>
+          </ul>
+        </div>
+        <div class="beam-pivot" aria-hidden="true"><i></i></div>
+        <div class="cost-side">
+          <h3>What gets heavier</h3>
+          <ul>
+            <li>Neighbor PQ codes are duplicated across graph edges on SSD</li>
+            <li>Larger node chunks may require more 4 KB reads</li>
+            <li>The evaluated implementation lacks filtering and dynamic indexing</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section class="quiz" id="quiz" aria-labelledby="quiz-title">
+      <div class="section-heading">
+        <h2 id="quiz-title">Can you route the idea back?</h2>
+        <p>Four short checks turn the animation into retrieval practice. Your answers stay in this browser tab.</p>
+      </div>
+      <form id="quiz-form" class="quiz-form"></form>
+      <div class="quiz-actions"><button class="action-button" id="check-quiz" type="button">Check answers</button><button class="plain-button" id="reset-quiz" type="button">Reset</button><p id="quiz-score" role="status"></p></div>
+    </section>
+
+    <section class="sources" id="sources" aria-labelledby="sources-title">
+      <div class="section-heading">
+        <h2 id="sources-title">Source ledger and fidelity</h2>
+        <p>The animation is a mental model with a paper trail. It does not claim to reproduce the authors’ benchmarks.</p>
+      </div>
+      <div class="source-ledger">
+        <div>
+          <h3>Primary material</h3>
+          <ul>
+            <li><a href="https://arxiv.org/abs/2404.06004" target="_blank" rel="noreferrer">AiSAQ paper record <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://arxiv.org/pdf/2404.06004" target="_blank" rel="noreferrer">Current v2 PDF <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://github.com/kioxia-jp/aisaq-diskann" target="_blank" rel="noreferrer">Authors’ implementation <span aria-hidden="true">↗</span></a></li>
+            <li><a href="https://laurentiugabriel.github.io/blog/articles/how-i-use-llms-to-learn/" target="_blank" rel="noreferrer">Learning-method reference <span aria-hidden="true">↗</span></a></li>
+          </ul>
+        </div>
+        <div>
+          <h3>Real</h3>
+          <p>Data placement, node-chunk fields, formulas, dataset presets, 4 KB block model, benchmark tables, and stated limitations.</p>
+          <h3>Simplified</h3>
+          <p>One query vehicle, a small visible graph, sequential hops, and spatially separated buildings. Real searches batch work and real SSD layouts are not little warehouses.</p>
+        </div>
+        <div>
+          <h3>Not established by the paper</h3>
+          <p>Production tail latency, sustained concurrency, update/delete behavior, failure recovery, billion-scale text retrieval, and total distributed-system cost.</p>
+          <p class="version-note">Explainer reviewed against arXiv v2 · 26 February 2025.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <p>Built to make one systems-paper idea visible.</p>
+    <p><a href="#top">Back to the yard ↑</a></p>
+  </footer>
+
+  <script src="js/content.js"></script>
+  <script src="js/iso.js"></script>
+  <script src="js/sim.js"></script>
+  <script src="js/render.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
