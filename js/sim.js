@@ -24,12 +24,66 @@
     "block-pack": "ssd-blocks",
     evidence: "evidence-panel",
   };
+  const REPRESENTATIVE_CORE_NOTE = "One representative core cluster is active; r neighbors are not mapped one-to-one to physical cores";
   const GPU_ROUTE = [
-    { beat: "dram-join", source: "host.dram", destination: "host.pcie", cameraTarget: "pcie", payload: "host-prepared scoring operands; canonical q remains host-resident" },
-    { beat: "inline-unpack", source: "host.pcie", destination: "gpu.vram", cameraTarget: "gpu-vram", payload: "illustrative operand transfer into VRAM; not a paper event" },
-    { beat: "pq-score", source: "gpu.vram", destination: "gpu.compute", cameraTarget: "gpu-compute", payload: "illustrative GPU-assisted scoring over host-prepared operands" },
-    { beat: "queue-commit", source: "gpu.compute", destination: "host.result", cameraTarget: "host-result", payload: "scalar result returns to host-owned search state" },
+    { id: "dram-to-pcie", beat: "dram-join", source: "host.dram", destination: "gpu.pcie-endpoint", cameraTarget: "pcie" },
+    { id: "pcie-to-memory-controller", beat: "inline-unpack", source: "gpu.pcie-endpoint", destination: "gpu.memory-controller.0", cameraTarget: "gpu-memory-controller" },
+    { id: "memory-controller-to-vram", beat: "inline-unpack", source: "gpu.memory-controller.0", destination: "gpu.vram.0", cameraTarget: "gpu-vram" },
+    { id: "vram-to-core", beat: "pq-score", source: "gpu.vram.0", destination: "gpu.core-cluster.0", cameraTarget: "gpu-cores" },
+    { id: "core-to-result-buffer", beat: "queue-commit", source: "gpu.core-cluster.0", destination: "gpu.result-buffer", cameraTarget: "gpu-result-buffer" },
+    { id: "result-buffer-to-host", beat: "queue-commit", source: "gpu.result-buffer", destination: "host.result", cameraTarget: "host-result" },
   ];
+
+  function buildComponentFlow(processor, steps, progress, options) {
+    const opts = options || {};
+    const normalized = Math.max(0, Math.min(1, Number(progress) || 0));
+    const scaled = normalized * Math.max(1, steps.length);
+    const activeStepIndex = opts.active === false
+      ? -1
+      : Math.min(steps.length - 1, Math.floor(scaled));
+    const activeProgress = normalized >= 1 - EPSILON ? 1 : scaled - activeStepIndex;
+    const resolvedSteps = steps.map((step, index) => {
+      const completed = normalized >= 1 - EPSILON || index < activeStepIndex;
+      const current = index === activeStepIndex;
+      return Object.assign({}, step, {
+        factStatus: "illustrative",
+        status: completed ? "completed" : current ? "current" : "pending",
+        progress: completed ? 1 : current ? Math.max(0, Math.min(1, activeProgress)) : 0,
+      });
+    });
+    return {
+      processor,
+      active: opts.active !== false,
+      factStatus: "illustrative",
+      operationFactStatus: opts.operationFactStatus || "illustrative",
+      geometryStatus: "illustrative",
+      title: opts.title || `${processor.toUpperCase()} component path`,
+      note: opts.note || REPRESENTATIVE_CORE_NOTE,
+      operation: opts.operation || "inspect",
+      unit: opts.unit || null,
+      progress: normalized,
+      activeStepIndex,
+      activeStep: activeStepIndex >= 0 ? resolvedSteps[activeStepIndex] : null,
+      representativeCoreCount: 1,
+      representativeCoreId: opts.representativeCoreId,
+      coreMapping: REPRESENTATIVE_CORE_NOTE,
+      route: steps.length ? [steps[0].source, ...steps.map((step) => step.destination)] : [],
+      resultTarget: opts.resultTarget || null,
+      steps: resolvedSteps,
+    };
+  }
+
+  function componentPresentation(flow) {
+    const active = flow && flow.activeStep;
+    return {
+      componentFlow: flow,
+      componentTitle: active && active.title || flow && flow.title || "",
+      componentNote: active && active.note || flow && flow.note || "",
+      componentPayload: active && active.payload || "",
+      componentStep: active && active.id || "",
+      geometryStatus: flow && flow.geometryStatus || "illustrative",
+    };
+  }
 
   class AiSAQSimulation {
     constructor(stages) {
@@ -259,34 +313,166 @@
       return { beat: fallback, progress: eventProgress };
     }
 
+    _cpuComponentMetadata(snapshot, paper) {
+      const eventText = `${paper.source} ${paper.destination} ${paper.payload}`.toLowerCase();
+      const exact = paper.beat === "exact-score"
+        || snapshot.phase && snapshot.phase.id === "record-current-vector"
+        || /cpu\.exact|scalar exact distance|full vector\(p\)/.test(eventText);
+      const active = ["pq-score", "exact-score"].includes(paper.beat) || /cpu\.(?:lut|exact)/.test(eventText);
+      const unit = exact ? "cpu.exact-unit" : "cpu.lut-unit";
+      const resultTarget = exact ? "host.exact-score-ledger" : "host.candidate-list";
+      const inputPayload = exact
+        ? "full vector(p) plus the canonical host query operand"
+        : "PQ operand bytes plus q-derived lookup state";
+      const operationPayload = exact
+        ? "exact-distance contribution during expansion"
+        : "PQ lookup contribution for scalar approximate distance";
+      const resultPayload = exact
+        ? "ID(p) plus scalar exact distance"
+        : "node ID plus scalar PQ distance and expansion state";
+      const steps = [
+        {
+          id: "cpu-input-to-cache",
+          title: "Operands enter the CPU package",
+          note: "The input port stages the current scoring operands before the component view follows them into the cache slices.",
+          source: "cpu.input-port",
+          destination: "cpu.cache.north",
+          cameraTarget: "cpu-cache",
+          payload: inputPayload,
+        },
+        {
+          id: exact ? "cpu-cache-to-exact" : "cpu-cache-to-lut",
+          title: exact ? "Cache feeds the exact-distance lane" : "Cache feeds the PQ lookup lane",
+          note: "The scoring role follows the source-backed CPU path; the drawn cache placement and internal wiring are conceptual.",
+          source: "cpu.cache.north",
+          destination: unit,
+          cameraTarget: exact ? "cpu-exact" : "cpu-lut",
+          payload: `${operationPayload}; cache residency and hit behavior are not traced`,
+        },
+        {
+          id: exact ? "cpu-exact-to-core" : "cpu-lut-to-core",
+          title: "One representative CPU core tile lights up",
+          note: `This shows where the scoring work affects a conceptual core tile. ${REPRESENTATIVE_CORE_NOTE}.`,
+          source: unit,
+          destination: "cpu.core.0",
+          cameraTarget: "cpu-cores",
+          payload: `${operationPayload}; ${REPRESENTATIVE_CORE_NOTE}`,
+        },
+        {
+          id: "cpu-core-to-result",
+          title: "The CPU retires compact scalar state",
+          note: exact ? "Only the ID and scalar exact distance continue to the host exact-score ledger." : "Only the node ID, scalar PQ distance, and expansion state continue to host search state.",
+          source: "cpu.core.0",
+          destination: "cpu.result-port",
+          cameraTarget: "cpu-result",
+          payload: resultPayload,
+        },
+      ];
+      const progress = exact
+        ? Math.max(0, Math.min(1, snapshot.phaseProgress / 0.55))
+        : snapshot.phaseProgress;
+      const flow = buildComponentFlow("cpu", steps, progress, {
+        active,
+        operationFactStatus: paper.factStatus,
+        operation: exact ? "exact-distance" : "pq-distance",
+        unit,
+        title: exact ? "CPU exact-distance components" : "CPU PQ-distance components",
+        note: `The operation follows the source-backed CPU path; cache placement, core scheduling, and die geometry are illustrative. ${REPRESENTATIVE_CORE_NOTE}.`,
+        representativeCoreId: "cpu.core.0",
+        resultTarget,
+      });
+      return Object.assign({
+        active,
+        reason: active ? "canonical CPU compute event" : "current paper event is outside the CPU component microtrace",
+      }, flow, { componentFlow: flow });
+    }
+
     _gpuHardwareSnapshot(snapshot) {
-      const scaled = Math.max(0, Math.min(1, snapshot.phaseProgress)) * GPU_ROUTE.length;
-      const index = Math.min(GPU_ROUTE.length - 1, Math.floor(scaled));
-      const route = GPU_ROUTE[index];
-      const progress = snapshot.phaseProgress >= 1 - EPSILON ? 1 : scaled - index;
       const exact = snapshot.phase && snapshot.phase.id === "record-current-vector";
-      return {
-        beat: index === 2 && exact ? "exact-score" : route.beat,
+      const seed = snapshot.phase && snapshot.phase.id === "seed-entrypoint";
+      const inputPayload = exact
+        ? "ID(p) + full vector(p) + read-only q copy; canonical q remains host-resident"
+        : seed
+          ? "entrypoint ID/PQ code(s) + q-derived LUT copy; canonical q remains host-resident"
+          : "neighbor ID/PQ operands + q-derived LUT copy; canonical q remains host-resident";
+      const scorePayload = exact
+        ? `illustrative exact-distance computation during expansion over full vector(p) and a read-only q copy; ${REPRESENTATIVE_CORE_NOTE}`
+        : `illustrative PQ-distance computation over a q-derived LUT copy; ${REPRESENTATIVE_CORE_NOTE}`;
+      const resultPayload = exact
+        ? "ID(p) + scalar exact distance"
+        : seed
+          ? "entrypoint ID + scalar PQ distance + unexpanded flag"
+          : "neighbor IDs + scalar PQ distances";
+      const steps = GPU_ROUTE.map((route, index) => Object.assign({}, route, {
+        beat: index === 3 && exact ? "exact-score" : route.beat,
+        title: [
+          "Host DRAM stages an accelerator copy",
+          "PCIe reaches the GPU memory controller",
+          "The controller writes one representative VRAM bank",
+          "One representative GPU core cluster receives work",
+          "Core output enters the GPU result buffer",
+          "Compact scalar state returns to the host",
+        ][index],
+        note: [
+          "This is an ephemeral illustrative copy from host-prepared operands, never a direct SSD-to-VRAM shortcut.",
+          "The memory controller is shown as the ingress point before any VRAM bank is written.",
+          "The selected bank stands for a conceptual operand copy, not persistent index residency or a real product layout.",
+          `The highlighted cluster is illustrative. ${REPRESENTATIVE_CORE_NOTE}.`,
+          "The component view reduces the illustrative work to compact result state before it leaves the board.",
+          "The host-owned candidate or exact-score ledger receives the result; canonical search ownership stays on the host.",
+        ][index],
+        payload: index === 0
+          ? `${inputPayload} leaves host DRAM as an ephemeral illustrative operand packet`
+          : index === 1
+            ? `${inputPayload} crosses the PCIe endpoint toward the illustrative GPU memory controller`
+            : index === 2
+              ? `${inputPayload} is copied into representative VRAM banks; it is not persistent index residency`
+              : index === 3
+                ? scorePayload
+                : index === 4
+                  ? `${resultPayload} enters the illustrative GPU result buffer`
+                  : `${resultPayload} returns to host-owned search state`,
+      }));
+      const flow = buildComponentFlow("gpu", steps, snapshot.phaseProgress, {
+        operationFactStatus: "illustrative",
+        operation: exact ? "exact-distance" : "pq-distance",
+        unit: "gpu.core-cluster.0",
+        title: exact ? "Illustrative GPU exact-distance path" : "Illustrative GPU PQ-distance path",
+        note: `This accelerator route was not evaluated by the AiSAQ paper or public implementation. ${REPRESENTATIVE_CORE_NOTE}.`,
+        representativeCoreId: "gpu.core-cluster.0",
+        resultTarget: exact ? "host.exact-score-ledger" : "host.candidate-list",
+      });
+      const step = flow.activeStep || flow.steps[0];
+      return Object.assign({
+        beat: step.beat,
         method: "both",
-        source: route.source,
-        destination: route.destination,
-        payload: index === 2 && exact
-          ? "illustrative GPU-assisted exact scoring over host-prepared operands during expansion; canonical q remains host-resident"
-          : route.payload,
-        progress,
+        source: step.source,
+        destination: step.destination,
+        payload: step.payload,
+        progress: step.progress,
         phaseProgress: snapshot.phaseProgress,
-        cameraTarget: route.cameraTarget,
+        cameraTarget: step.cameraTarget,
         factStatus: "illustrative",
         cacheMiss: false,
         computePath: "gpu-assist",
         queryResidency: "host",
+        cpu: {
+          active: false,
+          reason: "illustrative GPU assist replaces only the current compute microtrace",
+        },
         gpu: {
           active: true,
           reason: "illustrative opt-in; not in evaluated AiSAQ query path",
-          hop: index,
-          route: ["host.dram", "host.pcie", "gpu.vram", "gpu.compute", "host.result"],
+          hop: flow.activeStepIndex,
+          stepCount: flow.steps.length,
+          route: flow.route,
+          representativeCoreCount: 1,
+          representativeCoreId: flow.representativeCoreId,
+          coreMapping: flow.coreMapping,
+          resultTarget: flow.resultTarget,
+          componentFlow: flow,
         },
-      };
+      }, componentPresentation(flow));
     }
 
     hardwareSnapshot() {
@@ -341,8 +527,16 @@
         gpu: {
           active: false,
           reason: "not in evaluated AiSAQ query path",
+          stepCount: GPU_ROUTE.length,
+          route: [GPU_ROUTE[0].source, ...GPU_ROUTE.map((step) => step.destination)],
+          representativeCoreCount: 1,
+          representativeCoreId: "gpu.core-cluster.0",
+          coreMapping: REPRESENTATIVE_CORE_NOTE,
         },
       };
+      const cpu = this._cpuComponentMetadata(snapshot, paper);
+      paper.cpu = cpu;
+      if (cpu.active) Object.assign(paper, componentPresentation(cpu.componentFlow));
       if (this.state.computePath !== "gpu-assist") return paper;
       const gpuPhase = snapshot.phase && ["seed-entrypoint", "compute-pq-distance", "record-current-vector"].includes(snapshot.phase.id);
       if (gpuPhase) return this._gpuHardwareSnapshot(snapshot);
@@ -351,7 +545,11 @@
         gpu: {
           active: false,
           reason: "armed; current storage or host beat remains on the paper hardware path",
-          route: ["host.dram", "host.pcie", "gpu.vram", "gpu.compute", "host.result"],
+          stepCount: GPU_ROUTE.length,
+          route: [GPU_ROUTE[0].source, ...GPU_ROUTE.map((step) => step.destination)],
+          representativeCoreCount: 1,
+          representativeCoreId: "gpu.core-cluster.0",
+          coreMapping: REPRESENTATIVE_CORE_NOTE,
         },
       });
     }

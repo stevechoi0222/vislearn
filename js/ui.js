@@ -106,9 +106,97 @@
     }
   }
 
+  function componentStepFor(hardware) {
+    const flow = hardware?.componentFlow;
+    if (!flow || typeof flow !== "object") return null;
+    if (flow.activeStep && typeof flow.activeStep === "object") return flow.activeStep;
+    const stepId = String(flow.activeStep || hardware?.componentStep || "").trim();
+    return Array.isArray(flow.steps)
+      ? flow.steps.find((step) => String(step?.id || "") === stepId) || null
+      : null;
+  }
+
+  function componentMeta(hardware) {
+    const flow = hardware?.componentFlow && typeof hardware.componentFlow === "object"
+      ? hardware.componentFlow
+      : null;
+    const activeStep = componentStepFor(hardware);
+    return {
+      activeStep,
+      step: String(hardware?.componentStep || activeStep?.id || flow?.activeStep || "").trim(),
+      title: String(hardware?.componentTitle || activeStep?.title || flow?.title || "").trim(),
+      note: String(hardware?.componentNote || activeStep?.note || flow?.note || "").trim(),
+      coreMapping: String(flow?.coreMapping || "").trim(),
+      payload: String(hardware?.componentPayload || activeStep?.payload || flow?.payload || "").trim(),
+      source: activeStep?.source || hardware?.source,
+      destination: activeStep?.destination || hardware?.destination,
+      geometryStatus: String(hardware?.geometryStatus || activeStep?.geometryStatus || flow?.geometryStatus || "illustrative").trim(),
+    };
+  }
+
+  function gpuComponentRoute(hardware) {
+    const component = componentMeta(hardware);
+    const source = String(component.source || "").toLowerCase();
+    const destination = String(component.destination || "").toLowerCase();
+    const step = component.step.toLowerCase();
+    const hasSource = (token) => source.includes(token);
+    const hasDestination = (token) => destination.includes(token);
+    const sourceIsCore = hasSource("core-cluster") || hasSource("gpu.compute");
+    const destinationIsCore = hasDestination("core-cluster") || hasDestination("gpu.compute");
+
+    if (hasSource("pcie") && hasDestination("memory-controller")) return "memory-ingress";
+    if (hasSource("memory-controller") && hasDestination("vram")) return "vram-write";
+    if (hasSource("vram") && hasDestination("memory-controller")) return "vram-read";
+    if (hasSource("memory-controller") && destinationIsCore) return "core-dispatch";
+    if (sourceIsCore && (hasDestination("reducer") || hasDestination("result-buffer"))) return "core-reduce";
+    if ((sourceIsCore || hasSource("result-buffer")) && (hasDestination("host.result") || hasDestination("host-result"))) return "result-return";
+    if (step.includes("vram-write") || step.includes("memory-fill")) return "vram-write";
+    if (step.includes("vram-read")) return "vram-read";
+    if (step.includes("core-dispatch")) return "core-dispatch";
+    if (step.includes("core-reduce") || step.includes("reduce")) return "core-reduce";
+    if (step.includes("result-return") || step.includes("gpu-host")) return "result-return";
+    if (step.includes("memory-ingress") || step.includes("pcie-memory")) return "memory-ingress";
+    return "";
+  }
+
   function hardwareCopy(hardware, phase) {
+    const component = componentMeta(hardware);
     const gpuActive = hardware?.gpu?.active === true;
+    let resolvedCopy = null;
     if (gpuActive) {
+      const componentRoute = gpuComponentRoute(hardware);
+      if (componentRoute === "vram-read") {
+        resolvedCopy = [
+          "VRAM banks feed the GPU memory controller",
+          "The selected VRAM banks expose the illustrative operand copy before the controller dispatches work toward the core clusters.",
+        ];
+      } else if (componentRoute === "vram-write") {
+        resolvedCopy = [
+          "The GPU memory controller fills VRAM banks",
+          "The controller places the illustrative operand copy into visible VRAM banks; this transfer is outside the evaluated CPU paper path.",
+        ];
+      } else if (componentRoute === "core-dispatch") {
+        resolvedCopy = [
+          "The memory controller dispatches work to GPU core clusters",
+          "Illustrative work tiles receive operands from the GPU memory path. Their physical scheduling is a teaching abstraction, not an AiSAQ paper claim.",
+        ];
+      } else if (componentRoute === "core-reduce") {
+        resolvedCopy = [
+          "GPU core clusters reduce partial distances",
+          "The highlighted clusters feed a compact result buffer; only the resulting scalar state needs to return to the host.",
+        ];
+      } else if (componentRoute === "result-return") {
+        resolvedCopy = [
+          "The GPU result buffer returns scalar state",
+          "The illustrative accelerator sends a compact result back to the host-owned candidate or exact-score ledger.",
+        ];
+      } else if (componentRoute === "memory-ingress") {
+        resolvedCopy = [
+          "PCIe delivers operands to the GPU memory controller",
+          "The controller accepts a host-prepared illustrative copy; the canonical query q remains host-resident.",
+        ];
+      }
+
       const gpuCopy = {
         "dram-join": [
           "Operands leave DRAM for PCIe",
@@ -131,7 +219,7 @@
           "The GPU-assist route commits only the scalar result to the host-owned candidate or exact-score ledger.",
         ],
       };
-      if (gpuCopy[hardware?.beat]) return gpuCopy[hardware.beat];
+      if (!resolvedCopy && gpuCopy[hardware?.beat]) resolvedCopy = gpuCopy[hardware.beat];
     }
 
     const copy = {
@@ -148,7 +236,14 @@
       "block-pack": ["Watch the node cross 4 KiB boundaries", "Inline PQ bytes can enlarge an AiSAQ node read by one or more aligned logical units."],
       evidence: ["Compare the measured system costs", "The paper reports memory and index-load measurements; the 3D hardware route remains a teaching abstraction."],
     };
-    return copy[hardware?.beat] || [phase?.label || "Follow the active hardware path", phase?.shared || "The current trace event is highlighted in the server cutaway."];
+    if (!resolvedCopy) {
+      resolvedCopy = copy[hardware?.beat]
+        || [phase?.label || "Follow the active hardware path", phase?.shared || "The current trace event is highlighted in the server cutaway."];
+    }
+    const mappingNote = component.coreMapping && component.step.toLowerCase().includes("core")
+      ? `${resolvedCopy[1]} ${component.coreMapping}`
+      : resolvedCopy[1];
+    return [component.title || resolvedCopy[0], component.note || mappingNote];
   }
 
   function routeEndpoint(value, fallback) {
@@ -159,21 +254,38 @@
     if (text.includes("ssd.nand") || text.includes("lba(p)")) return "SSD · NAND";
     if (text.includes("dram.scratch") || text.includes("scratch-pool")) return "DRAM scratch";
     if (text.includes("dram.pq-array")) return "DRAM · PQ array";
-    if (text.includes("cpu.lut")) return "CPU · PQ lookup";
-    if (text.includes("cpu.exact")) return "CPU · exact scorer";
+    if (text.includes("cpu.cache")) return "CPU · cache slices";
+    if (text.includes("cpu.lut") || text.includes("lut-unit") || text.includes("lut-lane")) return "CPU · PQ lookup lane";
+    if (text.includes("cpu.exact") || text.includes("exact-unit") || text.includes("exact-lane")) return "CPU · exact-distance lane";
+    if (text.includes("cpu.core")) return "CPU · core tiles";
+    if (text.includes("cpu.reducer")) return "CPU · result reducer";
+    if (text.includes("cpu.result")) return "CPU · result lane";
     if (text.includes("seen-ids")) return "Seen-ID set";
     if (text.includes("candidate-list")) return "Candidate list L";
     if (text.includes("exact-score")) return "Exact-score ledger";
     if (text.includes("host.results") || text.includes("host.result")) return "Host result";
-    if (text.includes("gpu.vram")) return "GPU · VRAM";
-    if (text.includes("gpu.compute")) return "GPU scorer";
+    if (text.includes("gpu.memory-controller")) return "GPU · memory controller";
+    if (text.includes("gpu.vram")) return "GPU · VRAM banks";
+    if (text.includes("gpu.core") || text.includes("gpu.compute")) return "GPU · core clusters";
+    if (text.includes("gpu.reducer")) return "GPU · result reducer";
+    if (text.includes("gpu.result")) return "GPU · result buffer";
+    if (text.includes("gpu.pcie")) return "GPU · PCIe endpoint";
     if (text.includes("host.pcie") || text.includes("pcie")) return "PCIe / NVMe";
     if (text.includes("paper") || text.includes("reader")) return "Paper evidence";
     return raw.split("+")[0].trim() || fallback;
   }
 
   function routePayload(hardware) {
+    const component = componentMeta(hardware);
+    if (component.payload) return component.payload;
     if (hardware?.gpu?.active) {
+      const componentRoute = gpuComponentRoute(hardware);
+      if (componentRoute === "memory-ingress") return "Host operands entering the GPU memory path";
+      if (componentRoute === "vram-write") return "Illustrative operand copy written across VRAM banks";
+      if (componentRoute === "vram-read") return "Selected VRAM operands returning to the controller";
+      if (componentRoute === "core-dispatch") return "VRAM operands dispatched as core-cluster work";
+      if (componentRoute === "core-reduce") return "Parallel partial distances reduced to scalar state";
+      if (componentRoute === "result-return") return "Scalar result returning to host state";
       const gpu = {
         "dram-join": "Illustrative scoring operands",
         "inline-unpack": "Operand copy entering VRAM",
@@ -202,13 +314,17 @@
 
   function renderHardwareHeadline(sim, phase) {
     const hardware = hardwareSnapshot(sim);
+    const component = componentMeta(hardware);
     const movement = hardwareCopy(hardware, phase);
     $("#scene-action-label").textContent = movement[0];
     $("#scene-shared-cue").textContent = movement[1];
-    $("#scene-route-source").textContent = routeEndpoint(hardware?.source, "Fixed hardware");
-    $("#scene-route-destination").textContent = routeEndpoint(hardware?.destination, "Active buffer");
+    $("#scene-route-source").textContent = routeEndpoint(component.source, "Fixed hardware");
+    $("#scene-route-destination").textContent = routeEndpoint(component.destination, "Active buffer");
     $("#scene-route-payload").textContent = routePayload(hardware);
-    $(".stage-wrap").dataset.hardwareBeat = hardware?.beat || "inspect";
+    const stageWrap = $(".stage-wrap");
+    stageWrap.dataset.hardwareBeat = hardware?.beat || "inspect";
+    stageWrap.dataset.componentStep = component.step || "overview";
+    stageWrap.dataset.geometryStatus = component.geometryStatus;
     return hardware;
   }
 

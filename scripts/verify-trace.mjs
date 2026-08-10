@@ -93,6 +93,12 @@ content.stages.forEach((stage, stageIndex) => {
       require(hardware.phaseProgress >= 0 && hardware.phaseProgress <= 1, `${stage.id}/${phase.id} phase progress is not normalized`);
       require(hardware.computePath === "paper", `${stage.id}/${phase.id} unexpectedly left the paper path`);
       require(hardware.gpu?.active === false && hardware.gpu?.reason === "not in evaluated AiSAQ query path", `${stage.id}/${phase.id} misstates GPU truth`);
+      require(hardware.gpu?.stepCount === 6 && hardware.gpu?.route?.length === 7, `${stage.id}/${phase.id} lost the six-step illustrative GPU route metadata`);
+      require(hardware.gpu?.representativeCoreCount === 1 && hardware.gpu?.representativeCoreId === "gpu.core-cluster.0", `${stage.id}/${phase.id} does not constrain GPU activity to one representative core cluster`);
+      require(hardware.cpu?.componentFlow?.steps?.length === 4, `${stage.id}/${phase.id} lacks the CPU input → cache → unit → core → result metadata`);
+      require(hardware.cpu?.representativeCoreCount === 1 && hardware.cpu?.representativeCoreId === "cpu.core.0", `${stage.id}/${phase.id} does not constrain CPU activity to one representative core cluster`);
+      require(/not mapped one-to-one/i.test(hardware.cpu?.coreMapping || ""), `${stage.id}/${phase.id} CPU metadata may imply one core per neighbor`);
+      require(hardware.cpu?.componentFlow?.steps?.every((step) => step.factStatus === "illustrative"), `${stage.id}/${phase.id} CPU microarchitecture is not scoped as illustrative`);
       const transport = `${hardware.source} ${hardware.destination} ${hardware.payload}`;
       require(!/\bLBA\s*(?:[=:#]\s*|\s+)\d+\b/i.test(transport), `${stage.id}/${phase.id} hardware adapter leaks a numeric LBA`);
       require(!/\brequest(?:\s+id)?\s*(?:[=:#]\s*|\s+)\d+\b/i.test(transport), `${stage.id}/${phase.id} hardware adapter leaks a request ID`);
@@ -117,6 +123,28 @@ const readSnapshot = simulation.traceSnapshot();
 require(readSnapshot.dataset?.label === "KILT E5 22M", "Dataset-aware trace snapshot did not resolve KILT E5 22M");
 require(JSON.stringify(readSnapshot).includes("LBA(p)"), "Node-read trace must retain symbolic LBA(p)");
 
+simulation.goToPhase(3, 1);
+const cpuPqSpan = simulation.phaseSpan();
+simulation.setProgress(cpuPqSpan.start + (cpuPqSpan.end - cpuPqSpan.start) * 0.55);
+const cpuPq = simulation.hardwareSnapshot();
+require(cpuPq.cpu?.active && cpuPq.cpu?.unit === "cpu.lut-unit", "Paper PQ scoring did not activate the CPU LUT component path");
+require(cpuPq.cpu?.route?.join("|") === "cpu.input-port|cpu.cache.north|cpu.lut-unit|cpu.core.0|cpu.result-port", "CPU PQ component route has the wrong order");
+require(/PQ operand bytes.*q-derived lookup state/i.test(cpuPq.cpu?.componentFlow?.steps?.[0]?.payload || ""), "CPU PQ component input lost its operand metadata");
+
+simulation.goToPhase(4, 0);
+const cpuExactSpan = simulation.phaseSpan();
+simulation.setProgress(cpuExactSpan.start + (cpuExactSpan.end - cpuExactSpan.start) * 0.2);
+const cpuExact = simulation.hardwareSnapshot();
+require(cpuExact.cpu?.active && cpuExact.cpu?.unit === "cpu.exact-unit", "Paper exact scoring did not activate the CPU exact component path");
+require(cpuExact.cpu?.route?.join("|") === "cpu.input-port|cpu.cache.north|cpu.exact-unit|cpu.core.0|cpu.result-port", "CPU exact component route has the wrong order");
+require(cpuExact.cpu?.operationFactStatus !== "illustrative" && cpuExact.cpu?.geometryStatus === "illustrative", "CPU operation truth and illustrative geometry were not kept separate");
+
+simulation.goToPhase(2, 1);
+const canonicalStorageSpan = simulation.phaseSpan();
+simulation.setProgress(canonicalStorageSpan.start + (canonicalStorageSpan.end - canonicalStorageSpan.start) * 0.62);
+const canonicalStorage = simulation.hardwareSnapshot();
+require(canonicalStorage.computePath === "paper", "Canonical storage comparison fixture unexpectedly left the paper path");
+
 let computeReason = null;
 const unsubscribeCompute = simulation.subscribe((state, stage, reason) => { if (reason !== "init") computeReason = reason; });
 simulation.setComputePath("gpu-assist");
@@ -131,12 +159,17 @@ const storageBeats = [];
   storageBeats.push(hardware.beat);
   require(hardware.computePath === "gpu-assist" && hardware.gpu?.active === false, "GPU assist hid or replaced a storage beat");
   require(hardware.factStatus !== "illustrative", "GPU assist relabeled a paper storage beat as illustrative");
+  if (progress === 0.62) {
+    ["beat", "source", "destination", "payload", "cameraTarget", "factStatus"].forEach((key) => {
+      require(hardware[key] === canonicalStorage[key], `GPU assist changed canonical storage field ${key}`);
+    });
+  }
 });
 require(storageBeats.join("|") === "request|nand-read|block-return", "GPU assist does not preserve request → NAND → block-return");
 simulation.goToPhase(3, 1);
 const gpuSpan = simulation.phaseSpan();
 const gpuHops = [];
-[0.05, 0.3, 0.6, 0.9].forEach((progress) => {
+[0.05, 0.2, 0.38, 0.55, 0.72, 0.9].forEach((progress) => {
   simulation.setProgress(gpuSpan.start + (gpuSpan.end - gpuSpan.start) * progress);
   const hardware = simulation.hardwareSnapshot();
   gpuHops.push(`${hardware.source}>${hardware.destination}`);
@@ -144,13 +177,22 @@ const gpuHops = [];
   require(hardware.factStatus === "illustrative", "GPU assist must stay illustrative");
   require(hardware.gpu?.active === true, "GPU assist did not activate its separate route");
   require(hardware.queryResidency === "host", "GPU assist moved q away from the host");
+  require(hardware.componentFlow?.activeStep?.id === hardware.componentStep, "GPU component summary lost its active step object");
+  require(hardware.componentFlow?.activeStep?.source === hardware.source && hardware.componentFlow?.activeStep?.destination === hardware.destination, "GPU top-level route diverged from its component step");
 });
-require(gpuHops.join("|") === "host.dram>host.pcie|host.pcie>gpu.vram|gpu.vram>gpu.compute|gpu.compute>host.result", "GPU assist route is not DRAM → PCIe → VRAM → GPU → host result");
+require(gpuHops.join("|") === "host.dram>gpu.pcie-endpoint|gpu.pcie-endpoint>gpu.memory-controller.0|gpu.memory-controller.0>gpu.vram.0|gpu.vram.0>gpu.core-cluster.0|gpu.core-cluster.0>gpu.result-buffer|gpu.result-buffer>host.result", "GPU assist route is not DRAM → PCIe → memory controller → VRAM → representative core → result buffer → host");
+const gpuPq = simulation.hardwareSnapshot();
+require(gpuPq.gpu?.stepCount === 6 && gpuPq.componentFlow?.steps?.length === 6, "GPU component flow is not six steps");
+require(gpuPq.gpu?.representativeCoreCount === 1 && /not mapped one-to-one/i.test(gpuPq.gpu?.coreMapping || ""), "GPU metadata may imply one core per neighbor");
+require(JSON.stringify(gpuPq.componentFlow).includes("q-derived LUT copy"), "GPU PQ route lost the q-derived LUT copy");
+require(gpuPq.componentFlow?.steps?.every((step) => step.factStatus === "illustrative"), "A GPU component step escaped illustrative scope");
 simulation.goToPhase(4, 0);
 const exactGpuSpan = simulation.phaseSpan();
 simulation.setProgress(exactGpuSpan.start + (exactGpuSpan.end - exactGpuSpan.start) * 0.6);
 const exactGpu = simulation.hardwareSnapshot();
 require(exactGpu.beat === "exact-score" && exactGpu.factStatus === "illustrative" && /during expansion/i.test(exactGpu.payload), "GPU exact-score branch lost expansion-time truth");
+require(JSON.stringify(exactGpu.componentFlow).includes("read-only q copy") && exactGpu.queryResidency === "host", "GPU exact-score branch lacks a read-only q copy while preserving canonical host q");
+require(exactGpu.gpu?.resultTarget === "host.exact-score-ledger", "GPU exact-score result is not assigned to the host exact-score ledger");
 simulation.setComputePath("paper");
 
 const manualControls = [

@@ -17,6 +17,8 @@ The two methods remain separate comparison lanes. CPU, DRAM, and SSD colors iden
 
 The animation is driven by 12 named hardware beats: inspect, request, NAND read, block return, DRAM join, inline unpack, PQ score, exact score, queue commit, scratch release, block pack, and evidence. Those beats keep the hardware fixed while changing the payload, route, highlight, and camera target. A compact Anime.js route card mirrors each beat as source → payload → destination without covering the server cutaway.
 
+The Three.js hardware is an independently authored procedural component model rather than an imported product mesh. Its CPU assembly exposes the package, cache, LUT, exact-score, core, reducer, and result regions; its GPU assembly exposes the PCIe endpoint, memory controllers, VRAM banks, compute-core clusters, reducer, and result buffer. These stable subcomponents let the camera and data-flow highlights address each teaching region directly.
+
 ## Controls
 
 Run the full seven-stage path, play or pause, move to the previous or next phase, replay the current phase, scrub within it, restart, change dataset or speed, and switch between paired or single-method views. Playback holds for 2.2 seconds at each new stage and 1.4 seconds at each new action so the explanation can be read before motion resumes; these reading holds are not shortened by the speed control. The camera supports guided follow, pointer orbit, zoom, fit, and labels. The compute-path selector defaults to `Paper path · CPU`; `GPU assist · illustrative` branches host-prepared scoring operands through PCIe, VRAM, and GPU, then returns the scalar result to host-owned search state. It does not rewrite the paper's SSD request and NAND-return path.
@@ -39,8 +41,10 @@ The primary technical source is Kento Tatsuno et al., [“AiSAQ: All-in-Storage 
 
 The primary visual model is the full-inline layout evaluated in v2. The animated transport path intentionally shows a cache miss and omits CPU/OS cache internals. The evaluated/public AiSAQ path is presented as CPU-based. The optional GPU/VRAM branch is a separate illustrative systems path and is never presented as a paper result. The experience is a teaching trace, not captured production telemetry, a benchmark reproduction, or a literal rendering of the authors’ implementation. Measured values are attributed to paper tables; formulas and block spans are labeled derived; animation-only states are labeled illustrative.
 
+The generated CPU and GPU images under [`assets/references`](assets/references/README.md) are generic visual references only; they are not runtime textures, product photographs, or technical evidence. The reviewed external text-to-3D pipeline was not executed in this Darwin arm64 workspace because its Windows/NVIDIA Fooocus and Hunyuan3D services and optional Blender stage were unavailable, so this repository includes no pipeline-generated GLB or FBX.
+
 The interaction approach was informed by Laurentiu Raducu’s learning article and the public `rocket-engine` / `engineworks` examples. This implementation uses independently authored structure, code, artwork, and copy.
 
-Local visual verification covered the WebGL `hardware-3d` renderer at 1440 × 900 and 390 × 844 with zero browser-console warnings or errors, plus the repository's static-integrity and trace-contract checks. Assistive-technology sessions, physical-device behavior, and a production deployment were not verified.
+Local visual verification covered the WebGL `hardware-3d` renderer at 1440 × 900 and 390 × 844 with no application errors, plus the repository's static-integrity and trace-contract checks. Headless Chrome emitted only its WebGL `ReadPixels` performance notice. Assistive-technology sessions, physical-device behavior, and a production deployment were not verified.
 
 The repository includes a GitHub Pages workflow, but this document does not claim that a deployment has occurred.

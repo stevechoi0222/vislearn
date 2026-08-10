@@ -172,6 +172,18 @@
       parent.add(mesh);
       return mesh;
     }
+    if (typeof window.createHardwareComponentFactory !== "function") {
+      throw new Error("Detailed hardware component factory is unavailable.");
+    }
+    const componentFactory = window.createHardwareComponentFactory(THREE, {
+      chamferBox,
+      box,
+      edges,
+      hardwareMaterial,
+      material,
+      lineBetween,
+      colors,
+    });
     function labelTexture(text, background, foreground) {
       const labelCanvas = document.createElement("canvas");
       labelCanvas.width = 512;
@@ -336,27 +348,12 @@
         metalness: 0.08,
       }), "board-inlay", 0.008);
 
-      const cpuSocket = chamferBox(group, [1.98, 0.16, 1.82], [0.65, 2.01, 0], hardwareMaterial(0x202a2f, {
-        roughness: 0.5,
-        metalness: 0.58,
-        clearcoat: 0.18,
-      }), "cpu-socket", 0.035);
-      edges(group, cpuSocket, 0x7c878c, 0.58);
-      const cpu = chamferBox(group, [1.7, 0.55, 1.55], [0.65, 2.35, 0], hardwareMaterial(0xc68d24, {
-        roughness: 0.28,
-        metalness: 0.48,
-        clearcoat: 0.5,
-        emissive: colors.cpuDeep,
-        emissiveIntensity: 0.18,
-      }), "cpu", 0.07);
-      edges(group, cpu, 0xffd36d, 0.9);
-      const cpuCap = chamferBox(group, [1.28, 0.1, 1.1], [0.65, 2.675, 0], hardwareMaterial(colors.cpu, {
-        roughness: 0.2,
-        metalness: 0.72,
-        clearcoat: 0.52,
-      }), "cpu-cap", 0.035);
-      edges(group, cpuCap, 0xffe59a, 0.54);
-      label(group, "CPU · LUT / exact", [0.65, 2.82, 0.9], 2.3, "#2e2412", "#ffd978");
+      const cpuAssembly = componentFactory.createCpuAssembly(group, {
+        idPrefix: method,
+        position: [0.65, 2.35, 0],
+      });
+      const cpu = cpuAssembly.body;
+      const cpuLabel = label(group, "CPU · LUT / exact", [0.65, 3.12, 0.72], 2.3, "#2e2412", "#ffd978");
 
       const scratchSlot = chamferBox(group, [2.52, 0.16, 1.58], [0.55, 0.43, 0], hardwareMaterial(0x17243e, {
         roughness: 0.56,
@@ -475,59 +472,39 @@
       const pqStripe = box(ssdCopy, [isDisk ? 0.03 : 1.05, 0.46, 0.82], [isDisk ? 1.2 : 0.88, 0, 0], material(isDisk ? colors.steel : colors.pq));
       pqStripe.visible = !isDisk;
 
-      const gpuGroup = new THREE.Group();
       const componentMirror = isDisk ? -1 : 1;
       const gpuGroupX = isDisk ? 1.75 : -1.75;
-      const gpuDieX = -0.35 * componentMirror;
-      gpuGroup.position.set(gpuGroupX, -0.5, -1.18);
-      group.add(gpuGroup);
-      const gpuBoard = chamferBox(gpuGroup, [2.9, 1.65, 0.14], [0, 0, 0], hardwareMaterial(0x262b3b, {
-        roughness: 0.55,
-        metalness: 0.3,
-        clearcoat: 0.16,
-      }), "gpu-board", 0.025);
-      edges(gpuGroup, gpuBoard, 0x786ca9, 0.65);
-      const gpuDie = chamferBox(gpuGroup, [0.95, 0.95, 0.28], [gpuDieX, 0, 0.16], hardwareMaterial(colors.gpuDim, {
-        roughness: 0.28,
-        metalness: 0.46,
-        clearcoat: 0.4,
-        emissive: colors.gpu,
-        emissiveIntensity: 0.02,
-      }), "gpu", 0.045);
-      edges(gpuGroup, gpuDie, 0xaa92ef, 0.55);
-      const gpuDieCap = chamferBox(gpuGroup, [0.62, 0.62, 0.075], [gpuDieX, 0, 0.345], hardwareMaterial(0x51496e, {
-        roughness: 0.2,
-        metalness: 0.62,
-        clearcoat: 0.45,
-      }), "gpu-cap", 0.025);
-      const vram = [];
-      const vramCaps = [];
-      const vramPositions = [[-1.05, 0.56], [-1.05, -0.56], [0.45, 0.62], [0.45, -0.62]];
-      vramPositions.forEach((position) => {
-        const chipX = position[0] * componentMirror;
-        vram.push(chamferBox(gpuGroup, [0.48, 0.38, 0.24], [chipX, position[1], 0.16], hardwareMaterial(colors.gpuDim, {
-          roughness: 0.36,
-          metalness: 0.38,
-          emissive: colors.gpu,
-          emissiveIntensity: 0,
-        }), "vram", 0.03));
-        vramCaps.push(chamferBox(gpuGroup, [0.3, 0.22, 0.055], [chipX, position[1], 0.315], hardwareMaterial(0x494361, {
-          roughness: 0.24,
-          metalness: 0.52,
-        }), "vram-cap", 0.016));
+      const gpuGroupY = -0.2;
+      const gpuGroupZ = 1.28;
+      const gpuAssembly = componentFactory.createGpuAssembly(group, {
+        idPrefix: method,
+        mirror: componentMirror,
+        position: [gpuGroupX, gpuGroupY, gpuGroupZ],
       });
-      label(gpuGroup, "GPU · optional illustrative", [0, 1.16, 0.22], 2.75, "#241d3e", "#c8b7ff");
-      label(gpuGroup, "VRAM", [-0.86 * componentMirror, -0.2, 0.35], 1.05, "#241d3e", "#c8b7ff");
-      const vramAverageX = vramPositions.reduce((sum, position) => sum + position[0] * componentMirror, 0) / vramPositions.length;
+      const gpuGroup = gpuAssembly.group;
+      const gpuBoard = gpuAssembly.board;
+      const gpuDie = gpuAssembly.die;
+      const gpuDieCap = gpuAssembly.dieFrame;
+      const vram = gpuAssembly.vramBanks;
+      const vramCaps = gpuAssembly.vramCaps;
+      const gpuLabel = label(gpuGroup, "GPU · optional illustrative", [0, 1.16, 0.22], 2.75, "#241d3e", "#c8b7ff");
+      const gpuDetailLabel = label(gpuGroup, "VRAM · CORE ARRAY", [-0.72 * componentMirror, -0.16, 0.46], 1.45, "#241d3e", "#c8b7ff");
+      const gpuLanePoint = (point) => [gpuGroupX + point[0], gpuGroupY + point[1], gpuGroupZ + point[2]];
       const gpuPoints = {
-        pcie: [0.35, -0.05, -0.62],
-        vram: [gpuGroupX + vramAverageX, -0.5, -0.96],
-        compute: [gpuGroupX + gpuDieX, -0.5, -0.92],
-        link: [gpuGroupX + gpuDieX, 0.1, -1.18],
+        board: gpuLanePoint(gpuAssembly.anchors.board),
+        pcie: gpuLanePoint(gpuAssembly.anchors.pcie),
+        memoryController: gpuLanePoint(gpuAssembly.anchors.memoryController),
+        vram: gpuLanePoint(gpuAssembly.anchors.vram),
+        vramBanks: gpuAssembly.anchors.vramBanks.map(gpuLanePoint),
+        compute: gpuLanePoint(gpuAssembly.anchors.cores),
+        coreClusters: gpuAssembly.anchors.coreClusters.map(gpuLanePoint),
+        reducer: gpuLanePoint(gpuAssembly.anchors.reducer),
+        result: gpuLanePoint(gpuAssembly.anchors.result),
+        link: gpuLanePoint(gpuAssembly.anchors.pcie),
       };
       const gpuLink = lineBetween(group, [0.65, 2.05, -0.72], gpuPoints.link, colors.gpuDim, 0.045, 0.35);
 
-      return { method, group, chassis, board, cpu, scratch, scratchChips, pqBank, pqCells, pcie, controller, nand, nandChips, ssdCopy, gpuGroup, gpuBoard, gpuDie, gpuDieCap, vram, vramCaps, gpuLink, gpuPoints };
+      return { method, group, chassis, board, cpu, cpuAssembly, cpuLabel, scratch, scratchChips, pqBank, pqCells, pcie, controller, nand, nandChips, ssdCopy, gpuGroup, gpuAssembly, gpuLabel, gpuDetailLabel, gpuBoard, gpuDie, gpuDieCap, vram, vramCaps, gpuLink, gpuPoints };
     }
 
     const lanes = {
@@ -556,12 +533,14 @@
     const scalarTokens = { diskann: [], aisaq: [] };
     const queueTokens = {};
     const exactVectors = {};
+    const cpuTokens = { diskann: [], aisaq: [] };
     const gpuTokens = { diskann: [], aisaq: [] };
     ["diskann", "aisaq"].forEach((method) => {
       for (let index = 0; index < 4; index += 1) scalarTokens[method].push(packet(dynamic, [0.34, 0.25, 0.38], colors.white, index === 0 ? "d" : ""));
       queueTokens[method] = packet(dynamic, [1.15, 0.42, 0.55], colors.white, "ID + scalar");
       exactVectors[method] = packet(dynamic, [1.25, 0.48, 0.68], colors.vector, "full vector");
-      for (let index = 0; index < 5; index += 1) gpuTokens[method].push(packet(dynamic, [0.28, 0.28, 0.28], index < 4 ? colors.pq : colors.white, ""));
+      for (let index = 0; index < 3; index += 1) cpuTokens[method].push(packet(dynamic, [0.22, 0.18, 0.22], index === 0 ? colors.pq : colors.cpu, ""));
+      for (let index = 0; index < 5; index += 1) gpuTokens[method].push(packet(dynamic, [0.18, 0.18, 0.18], index < 4 ? colors.pq : colors.white, ""));
     });
 
     const blockBay = new THREE.Group();
@@ -620,6 +599,14 @@
     function inferFrame(state, context) {
       const directHardware = context && context.beat ? context : null;
       const hardware = (context && context.hardware) || directHardware || {};
+      const componentFlow = hardware.componentFlow && typeof hardware.componentFlow === "object" ? hardware.componentFlow : null;
+      let activeComponentStep = componentFlow?.activeStep && typeof componentFlow.activeStep === "object"
+        ? componentFlow.activeStep
+        : null;
+      const activeComponentStepId = String(hardware.componentStep || componentFlow?.activeStep || "").trim();
+      if (!activeComponentStep && activeComponentStepId && Array.isArray(componentFlow?.steps)) {
+        activeComponentStep = componentFlow.steps.find((entry) => String(entry?.id || "") === activeComponentStepId) || null;
+      }
       const trace = (context && context.trace) || (state && state.trace) || {};
       const nestedScene = trace.scene && typeof trace.scene === "object" ? trace.scene : {};
       const stageObject = (context && context.stage) || context || {};
@@ -656,23 +643,40 @@
                 : beat === "evidence" ? "evidence" : fallbackFamily;
       const datasetSource = trace.dataset || hardware.dataset || (state && state.dataset) || "SIFT1B";
       const datasetName = typeof datasetSource === "string" ? datasetSource : (datasetSource.label || datasetSource.id || "SIFT1B");
-      const sourceDestination = `${hardware.source || ""} ${hardware.destination || ""}`.toLowerCase();
+      const resolvedSource = activeComponentStep?.source || hardware.source || "";
+      const resolvedDestination = activeComponentStep?.destination || hardware.destination || "";
+      const sourceDestination = `${resolvedSource} ${resolvedDestination}`.toLowerCase();
       const hardwareGpuActive = Boolean(hardware.gpu && hardware.gpu.active);
       const requestedPath = hardware.computePath || (sourceDestination.includes("gpu") || sourceDestination.includes("vram") || hardwareGpuActive ? "gpu-assist" : computePath);
       const gpuMode = ["gpu", "gpu-assist"].includes(requestedPath) ? "gpu-assist" : "paper";
       const computeBeat = ["pq-score", "exact-score"].includes(beat);
       const hasHardwareGpuFlag = hardware.gpu && typeof hardware.gpu.active === "boolean";
       const gpuActive = hasHardwareGpuFlag ? hardware.gpu.active : computeBeat && gpuMode === "gpu-assist";
+      let componentProgress = Number(hardware.componentProgress ?? activeComponentStep?.progress ?? componentFlow?.stepProgress);
+      if (!Number.isFinite(componentProgress)) componentProgress = progress;
+      componentProgress = clamp(componentProgress, 0, 1);
+      if (reducedMotion) componentProgress = componentProgress >= 0.5 ? 1 : 0;
       return {
         beat,
         family,
         progress,
         datasetName,
         method: ["diskann", "aisaq"].includes(hardware.method) ? hardware.method : "both",
-        cameraTarget: hardware.cameraTarget || "overview",
-        source: hardware.source || "",
-        destination: hardware.destination || "",
+        cameraTarget: hardware.componentFocus || activeComponentStep?.cameraTarget || hardware.cameraTarget || "overview",
+        source: resolvedSource,
+        destination: resolvedDestination,
         payload: hardware.payload || "",
+        componentStep: activeComponentStepId,
+        componentProgress,
+        componentFocus: hardware.componentFocus || hardware.cameraTarget || "",
+        componentTitle: hardware.componentTitle || activeComponentStep?.title || componentFlow?.title || "",
+        componentNote: hardware.componentNote || activeComponentStep?.note || componentFlow?.note || "",
+        componentPayload: hardware.componentPayload || activeComponentStep?.payload || componentFlow?.payload || "",
+        activeComponents: Array.isArray(hardware.activeComponents)
+          ? hardware.activeComponents
+          : Array.isArray(componentFlow?.activeComponents) ? componentFlow.activeComponents : [],
+        geometryStatus: hardware.geometryStatus || activeComponentStep?.geometryStatus || componentFlow?.geometryStatus || "",
+        operationStatus: hardware.operationStatus || hardware.factStatus || "",
         computePath: gpuMode,
         gpuActive,
         labels: !state || state.labels !== false,
@@ -681,6 +685,22 @@
 
     function laneWorld(lane, local) {
       return new THREE.Vector3(lane.group.position.x + local[0], local[1], local[2]);
+    }
+    function cpuWorld(lane, key, index) {
+      const assembly = lane.cpuAssembly;
+      const anchor = key === "cores"
+        ? assembly.anchors.cores[index == null ? 0 : index]
+        : assembly.anchors[key];
+      return laneWorld(lane, [
+        assembly.group.position.x + anchor[0],
+        assembly.group.position.y + anchor[1],
+        assembly.group.position.z + anchor[2],
+      ]);
+    }
+    function gpuWorld(lane, key, index) {
+      const points = lane.gpuPoints[key];
+      const point = Array.isArray(points?.[0]) ? points[index == null ? 0 : index] : points;
+      return laneWorld(lane, point);
     }
     function resetDynamicVisibility() {
       Object.values(requestPulses).forEach((pulse) => { pulse.visible = false; });
@@ -691,6 +711,7 @@
       Object.values(scalarTokens).flat().forEach((token) => { token.visible = false; });
       Object.values(queueTokens).forEach((token) => { token.visible = false; });
       Object.values(exactVectors).forEach((token) => { token.visible = false; });
+      Object.values(cpuTokens).flat().forEach((token) => { token.visible = false; });
       Object.values(gpuTokens).flat().forEach((token) => { token.visible = false; });
     }
     function applyView() {
@@ -713,6 +734,17 @@
       Object.values(hostBodies).forEach((body) => setGlow(body, colors.dramDeep, 0));
       Object.values(lanes).forEach((lane) => {
         setGlow(lane.cpu, colors.cpuDeep, 0.18);
+        lane.cpuAssembly.coreTiles.forEach((tile) => {
+          setGlow(tile, colors.cpuDeep, 0.025);
+          tile.scale.setScalar(1);
+        });
+        lane.cpuAssembly.cacheSlices.forEach((slice) => setGlow(slice, colors.cpuDeep, 0.03));
+        setGlow(lane.cpuAssembly.lutUnit, colors.cpu, 0.08);
+        setGlow(lane.cpuAssembly.exactUnit, colors.vector, 0.04);
+        setGlow(lane.cpuAssembly.reducer, colors.cpuDeep, 0.03);
+        setGlow(lane.cpuAssembly.inputPort, colors.dram, 0.08);
+        setGlow(lane.cpuAssembly.resultPort, colors.white, 0.05);
+        lane.cpuAssembly.flowTraces.forEach((trace) => setGlow(trace, colors.cpuDeep, 0));
         setGlow(lane.scratch, colors.dramDeep, 0.12);
         lane.scratch.material.opacity = 0.82;
         lane.scratchChips.forEach((chip) => { chip.material.opacity = 0.86; });
@@ -720,11 +752,23 @@
         lane.nandChips.forEach((chip) => setGlow(chip, colors.ssdDeep, 0.06));
         lane.pqCells.forEach((cell) => setGlow(cell, colors.pq, 0.04));
         lane.ssdCopy.scale.set(1, 1, 1);
+        lane.gpuAssembly.coreClusters.forEach((cluster) => {
+          setGlow(cluster, colors.gpu, 0.02);
+          cluster.scale.setScalar(1);
+        });
+        lane.gpuAssembly.memoryControllers.forEach((controller) => setGlow(controller, colors.returnBlock, 0.025));
+        setGlow(lane.gpuAssembly.reducer, colors.gpu, 0.025);
+        setGlow(lane.gpuAssembly.resultBuffer, colors.gpu, 0.025);
+        setGlow(lane.gpuAssembly.pcieEndpoint, colors.gpu, 0.02);
+        lane.vram.forEach((chip) => chip.scale.setScalar(1));
+        lane.gpuAssembly.flowTraces.forEach((trace) => setGlow(trace, colors.gpu, 0));
       });
     }
     function updateGpuMode(mode) {
       const active = mode === "gpu-assist";
       Object.values(lanes).forEach((lane) => {
+        lane.gpuGroup.visible = active;
+        lane.gpuLink.visible = active;
         lane.gpuBoard.material.color.setHex(active ? 0x393052 : 0x262b3b);
         lane.gpuDie.material.color.setHex(active ? colors.gpu : colors.gpuDim);
         lane.gpuDieCap.material.color.setHex(active ? 0xb19af0 : 0x51496e);
@@ -732,6 +776,8 @@
         lane.vramCaps.forEach((chip) => chip.material.color.setHex(active ? 0x9c83dc : 0x494361));
         setGlow(lane.gpuDie, colors.gpu, active ? 0.35 : 0.02);
         lane.vram.forEach((chip) => setGlow(chip, colors.gpu, active ? 0.16 : 0));
+        lane.gpuAssembly.coreClusters.forEach((cluster) => setGlow(cluster, colors.gpu, active ? 0.1 : 0.02));
+        lane.gpuAssembly.memoryControllers.forEach((controller) => setGlow(controller, colors.returnBlock, active ? 0.12 : 0.025));
         lane.gpuLink.material.color.setHex(active ? colors.gpu : colors.gpuDim);
         lane.gpuLink.material.opacity = active ? 0.72 : 0.2;
       });
@@ -743,29 +789,53 @@
     function cameraFocus(frame) {
       const methods = methodsFor(frame, frame.gpuActive);
       const laneX = methods.length ? methods.reduce((sum, method) => sum + lanes[method].group.position.x, 0) / methods.length : 0;
-      const averageGpuPoint = (key) => {
-        if (!methods.length) return new THREE.Vector3(0, -0.5, -1);
-        const total = methods.reduce((sum, method) => sum.add(laneWorld(lanes[method], lanes[method].gpuPoints[key])), new THREE.Vector3());
+      const averageCpuPoint = (key) => {
+        if (!methods.length) return new THREE.Vector3(0, 2.35, 0);
+        const total = methods.reduce((sum, method) => sum.add(cpuWorld(lanes[method], key)), new THREE.Vector3());
         return total.multiplyScalar(1 / methods.length);
       };
+      const averageGpuPoint = (key) => {
+        if (!methods.length) return new THREE.Vector3(0, -0.5, -1);
+        const total = methods.reduce((sum, method) => sum.add(gpuWorld(lanes[method], key)), new THREE.Vector3());
+        return total.multiplyScalar(1 / methods.length);
+      };
+      const cpuPackagePoint = averageCpuPoint("package");
+      const cpuLutPoint = averageCpuPoint("lut");
+      const cpuExactPoint = averageCpuPoint("exact");
+      const cpuCorePoint = averageCpuPoint("core");
+      const cpuResultPoint = averageCpuPoint("result");
+      const gpuBoardPoint = averageGpuPoint("board");
+      const gpuMemoryControllerPoint = averageGpuPoint("memoryController");
       const gpuVramPoint = averageGpuPoint("vram");
       const gpuComputePoint = averageGpuPoint("compute");
-      const gpuDistance = methods.length > 1 ? 11.2 : 9.4;
+      const gpuResultPoint = averageGpuPoint("result");
+      const cpuDistance = methods.length > 1 ? 11.4 : 7.8;
+      const gpuDistance = methods.length > 1 ? 11.4 : 7.9;
       const targets = {
         overview: { point: [0, 0.65, 0], distance: 18 },
         "ssd-controller": { point: [laneX + 0.55, -1.45, 0], distance: 10.3 },
         "ssd-nand": { point: [laneX + 0.3, -2.75, 0], distance: 10.4 },
         "dram-scratch": { point: [laneX + 0.55, 0.75, 0], distance: 10.6 },
         "dram-pq-array": { point: [laneX - 2.05, 0.75, 0], distance: 10.8 },
-        "cpu-lut": { point: [laneX + 0.65, 2.35, 0], distance: 10.6 },
-        "cpu-exact": { point: [laneX + 0.65, 2.35, 0], distance: 10.6 },
+        "cpu-package": { point: [cpuPackagePoint.x, cpuPackagePoint.y, cpuPackagePoint.z], distance: cpuDistance + 0.8 },
+        "cpu-cache": { point: [cpuPackagePoint.x, cpuPackagePoint.y, cpuPackagePoint.z], distance: cpuDistance },
+        "cpu-lut": { point: [cpuLutPoint.x, cpuLutPoint.y, cpuLutPoint.z], distance: cpuDistance },
+        "cpu-exact": { point: [cpuExactPoint.x, cpuExactPoint.y, cpuExactPoint.z], distance: cpuDistance },
+        "cpu-cores": { point: [cpuCorePoint.x, cpuCorePoint.y, cpuCorePoint.z], distance: cpuDistance - 0.3 },
+        "cpu-result": { point: [cpuResultPoint.x, cpuResultPoint.y, cpuResultPoint.z], distance: cpuDistance },
         "host-queues": { point: [-0.35, 4.75, 0], distance: 11.8 },
         "host-result": { point: [4.75, 4.75, 0], distance: 10.8 },
         "ssd-blocks": { point: [0, -0.7, 1.3], distance: 11.4 },
         "evidence-panel": { point: [0, 0.4, 0], distance: 16.2 },
         pcie: { point: [laneX + 0.55, -0.05, -0.1], distance: 10.8 },
+        "gpu-board": { point: [gpuBoardPoint.x, gpuBoardPoint.y, gpuBoardPoint.z], distance: gpuDistance + 0.7 },
+        "gpu-memory-controller": { point: [gpuMemoryControllerPoint.x, gpuMemoryControllerPoint.y, gpuMemoryControllerPoint.z], distance: gpuDistance },
+        "gpu-memory": { point: [gpuMemoryControllerPoint.x, gpuMemoryControllerPoint.y, gpuMemoryControllerPoint.z], distance: gpuDistance },
         "gpu-vram": { point: [gpuVramPoint.x, gpuVramPoint.y, gpuVramPoint.z], distance: gpuDistance },
-        "gpu-compute": { point: [gpuComputePoint.x, gpuComputePoint.y, gpuComputePoint.z], distance: gpuDistance },
+        "gpu-compute": { point: [gpuComputePoint.x, gpuComputePoint.y, gpuComputePoint.z], distance: gpuDistance - 0.25 },
+        "gpu-cores": { point: [gpuComputePoint.x, gpuComputePoint.y, gpuComputePoint.z], distance: gpuDistance - 0.25 },
+        "gpu-result": { point: [gpuResultPoint.x, gpuResultPoint.y, gpuResultPoint.z], distance: gpuDistance },
+        "gpu-result-buffer": { point: [gpuResultPoint.x, gpuResultPoint.y, gpuResultPoint.z], distance: gpuDistance },
       };
       const target = targets[frame.cameraTarget] || targets.overview;
       const aspect = width / Math.max(1, height);
@@ -849,7 +919,7 @@
       const lane = lanes[method];
       const offset = method === "diskann" ? 0 : 5;
       const source = inline ? laneWorld(lane, [0.55, 0.75, 0.65]) : laneWorld(lane, [-2.05, 0.75, 0.65]);
-      const target = laneWorld(lane, [0.65, 2.35, 0.9]);
+      const target = cpuWorld(lane, "input");
       for (let index = 0; index < 5; index += 1) {
         const fragment = pqFragments[offset + index];
         fragment.visible = true;
@@ -860,35 +930,91 @@
       if (inline) setGlow(lane.scratch, colors.pq, 0.65);
       else lane.pqCells.forEach((cell) => setGlow(cell, colors.pq, 0.65));
     }
+    function resolveCpuComponentStep(frame) {
+      const name = String(frame.componentStep || "").toLowerCase();
+      if (name.includes("retire") || name.includes("result") || name.includes("output")) return { step: "retire", progress: frame.componentProgress };
+      if (name.includes("core") || name.includes("execute") || name.includes("dispatch")) return { step: "core", progress: frame.componentProgress };
+      if (name.includes("lut") || name.includes("exact") || name.includes("function") || name.includes("unit")) return { step: "function", progress: frame.componentProgress };
+      if (name.includes("ingress") || name.includes("input") || name.includes("cache")) return { step: "ingress", progress: frame.componentProgress };
+      const scaled = clamp(frame.progress, 0, 1) * 4;
+      const index = Math.min(3, Math.floor(scaled));
+      return { step: ["ingress", "function", "core", "retire"][index], progress: scaled - index };
+    }
+    function cpuInputWorld(frame, lane, method, exact) {
+      const source = String(frame.source || "").toLowerCase();
+      if (source.includes("host.query") || source.endsWith(".q")) return new THREE.Vector3(-5.05, 4.78, 0.05);
+      if (source.includes("centroid") || source.includes("host.lut")) return new THREE.Vector3(-3, 4.78, 0.05);
+      if (source.includes("pq-array") || (method === "diskann" && !exact && !source.includes("scratch"))) return laneWorld(lane, [-2.05, 0.75, 0.65]);
+      return laneWorld(lane, [0.55, 0.75, 0.72]);
+    }
+    function updateCpuComponentFlow(frame, method, exact) {
+      const lane = lanes[method];
+      const resolved = resolveCpuComponentStep(frame);
+      const local = clamp(resolved.progress, 0, 1);
+      const input = cpuWorld(lane, "input");
+      const cache = cpuWorld(lane, "cache");
+      const unit = cpuWorld(lane, exact ? "exact" : "lut");
+      const core = cpuWorld(lane, "cores", 0);
+      const reducer = cpuWorld(lane, "reducer");
+      const result = cpuWorld(lane, "result");
+      const source = cpuInputWorld(frame, lane, method, exact);
+      const paths = {
+        ingress: [source, input, cache],
+        function: [cache, unit],
+        core: [unit, core],
+        retire: [core, reducer, result],
+      };
+      const tokens = exact && resolved.step === "ingress" ? [exactVectors[method]] : cpuTokens[method];
+      tokens.forEach((token, index) => {
+        token.visible = true;
+        setPathPosition(token, paths[resolved.step], clamp(local * 1.18 - index * 0.075, 0, 1));
+        token.position.z += (index - (tokens.length - 1) / 2) * 0.055;
+      });
+
+      setGlow(lane.cpu, exact ? colors.vector : colors.cpu, 0.42);
+      if (resolved.step === "ingress") {
+        setGlow(lane.cpuAssembly.inputPort, exact ? colors.vector : colors.pq, 1.35);
+        lane.cpuAssembly.cacheSlices.forEach((slice) => setGlow(slice, exact ? colors.vector : colors.cpu, 0.75));
+        setGlow(lane.cpuAssembly.flowTraces[exact ? 2 : 0], exact ? colors.vector : colors.pq, 1.1);
+      } else if (resolved.step === "function") {
+        lane.cpuAssembly.cacheSlices.forEach((slice) => setGlow(slice, exact ? colors.vector : colors.cpu, 0.55));
+        setGlow(exact ? lane.cpuAssembly.exactUnit : lane.cpuAssembly.lutUnit, exact ? colors.vector : colors.pq, 1.65);
+        setGlow(lane.cpuAssembly.flowTraces[exact ? 3 : 1], exact ? colors.vector : colors.pq, 1.2);
+      } else if (resolved.step === "core") {
+        setGlow(exact ? lane.cpuAssembly.exactUnit : lane.cpuAssembly.lutUnit, exact ? colors.vector : colors.pq, 0.8);
+        setGlow(lane.cpuAssembly.coreTiles[0], exact ? colors.vector : colors.cpu, 1.75);
+        lane.cpuAssembly.coreTiles[0].scale.setScalar(1 + Math.sin(local * Math.PI) * 0.085);
+      } else {
+        setGlow(lane.cpuAssembly.coreTiles[0], exact ? colors.vector : colors.cpu, 0.95);
+        setGlow(lane.cpuAssembly.reducer, exact ? colors.vector : colors.cpu, 1.35);
+        setGlow(lane.cpuAssembly.resultPort, colors.white, 1.55);
+        setGlow(lane.cpuAssembly.flowTraces[4], exact ? colors.vector : colors.cpu, 1.15);
+        setGlow(lane.cpuAssembly.flowTraces[5], colors.white, 1.25);
+      }
+      return { step: resolved.step, progress: local, result };
+    }
     function updatePqScore(frame) {
       methodsFor(frame).forEach((method) => {
-        const lane = lanes[method];
-        const cpu = laneWorld(lane, [0.65, 2.35, 0.9]);
+        const flow = updateCpuComponentFlow(frame, method, false);
         const hostL = new THREE.Vector3(-0.35, 4.78, 0.05);
-        setGlow(lane.cpu, colors.cpu, 0.55 + Math.sin(frame.progress * Math.PI) ** 2 * 1.3);
-        setGlow(hostBodies.L, colors.white, 0.55);
+        if (flow.step !== "retire") return;
+        setGlow(hostBodies.L, colors.white, 0.55 + flow.progress * 0.45);
         scalarTokens[method].forEach((token, index) => {
           token.visible = true;
-          setPathPosition(token, [cpu, new THREE.Vector3(lerp(cpu.x, hostL.x, 0.55), 3.6, 1), hostL], clamp(frame.progress * 1.25 - index * 0.08, 0, 1));
+          setPathPosition(token, [flow.result, new THREE.Vector3(lerp(flow.result.x, hostL.x, 0.55), 3.6, 1), hostL], clamp(flow.progress * 1.25 - index * 0.08, 0, 1));
           token.position.z += (index - 1.5) * 0.09;
         });
       });
     }
     function updateExactScore(frame) {
       methodsFor(frame).forEach((method) => {
-        const lane = lanes[method];
-        const vector = exactVectors[method];
-        vector.visible = true;
-        const scratch = laneWorld(lane, [0.55, 0.75, 0.72]);
-        const cpu = laneWorld(lane, [0.65, 2.35, 0.92]);
+        const flow = updateCpuComponentFlow(frame, method, true);
         const ledger = new THREE.Vector3(4.75, 4.78, 0.08);
-        setPathPosition(vector, [scratch, cpu], clamp(frame.progress / 0.58, 0, 1));
-        vector.visible = frame.progress < 0.7;
+        if (flow.step !== "retire") return;
         const scalar = scalarTokens[method][0];
-        scalar.visible = frame.progress > 0.48;
-        setPathPosition(scalar, [cpu, new THREE.Vector3(lerp(cpu.x, ledger.x, 0.52), 3.65, 1), ledger], clamp((frame.progress - 0.48) / 0.52, 0, 1));
-        setGlow(lane.cpu, colors.vector, 0.45 + frame.progress);
-        setGlow(hostBodies.exact, colors.vector, 0.7);
+        scalar.visible = flow.progress > 0.08;
+        setPathPosition(scalar, [flow.result, new THREE.Vector3(lerp(flow.result.x, ledger.x, 0.52), 3.65, 1), ledger], flow.progress);
+        setGlow(hostBodies.exact, colors.vector, 0.55 + flow.progress * 0.4);
       });
     }
     function updateQueueCommit(frame) {
@@ -925,57 +1051,101 @@
       setGlow(hostBodies.L, colors.white, pulse * 0.55);
       lanes.aisaq.ssdCopy.scale.setScalar(1 + pulse * 0.035);
     }
+    function resolveGpuComponentStep(frame) {
+      const name = String(frame.componentStep || "").toLowerCase();
+      const source = String(frame.source || "").toLowerCase();
+      const destination = String(frame.destination || "").toLowerCase();
+      if (name.includes("host-return") || name.includes("result-return") || (source.includes("result-buffer") && destination.includes("host"))) return { step: "result-host", progress: frame.componentProgress };
+      if (name.includes("core-reduce") || name.includes("reduce-result") || name.includes("result-buffer")) return { step: "core-result", progress: frame.componentProgress };
+      if (name.includes("core-dispatch") || name.includes("dispatch") || name.includes("vram-read") || (source.includes("vram") && destination.includes("core"))) return { step: "vram-core", progress: frame.componentProgress };
+      if (name.includes("vram-write") || name.includes("vram-load") || (source.includes("controller") && destination.includes("vram"))) return { step: "controller-vram", progress: frame.componentProgress };
+      if (name.includes("memory-ingress") || name.includes("pcie-ingress") || (source.includes("pcie") && destination.includes("controller"))) return { step: "pcie-controller", progress: frame.componentProgress };
+      if (name.includes("host-to-pcie") || name.includes("dram-to-pcie") || name.includes("dram-pcie") || destination.includes("pcie")) return { step: "host-pcie", progress: frame.componentProgress };
+      const scaled = clamp(frame.progress, 0, 1) * 6;
+      const index = Math.min(5, Math.floor(scaled));
+      return { step: ["host-pcie", "pcie-controller", "controller-vram", "vram-core", "core-result", "result-host"][index], progress: scaled - index };
+    }
     function updateGpuAssist(frame) {
       const methods = methodsFor(frame, true);
-      const source = String(frame.source || "").toLowerCase();
+      const resolved = resolveGpuComponentStep(frame);
+      const local = clamp(resolved.progress, 0, 1);
       const destinationName = String(frame.destination || "").toLowerCase();
-      const payloadName = typeof frame.payload === "string" ? frame.payload.toLowerCase() : JSON.stringify(frame.payload || {}).toLowerCase();
-      const segment = source.includes("pcie") && destinationName.includes("vram") ? "pcie-vram"
-        : source.includes("vram") && destinationName.includes("gpu") ? "vram-gpu"
-          : source.includes("gpu") && (destinationName.includes("host") || destinationName.includes("result") || destinationName.includes("queue") || destinationName.includes("ledger")) ? "gpu-host"
-            : destinationName.includes("pcie") || source.includes("dram") || source.includes("scratch") ? "dram-pcie"
-              : frame.cameraTarget === "gpu-vram" ? "pcie-vram"
-                : frame.cameraTarget === "gpu-compute" ? "vram-gpu"
-                  : frame.cameraTarget === "host-result" ? "gpu-host" : "dram-pcie";
+      const payloadValue = frame.componentPayload || frame.payload || "";
+      const payloadName = typeof payloadValue === "string" ? payloadValue.toLowerCase() : JSON.stringify(payloadValue).toLowerCase();
       methods.forEach((method) => {
         const lane = lanes[method];
         const scratch = laneWorld(lane, [0.55, 0.75, 0.72]);
-        const pcie = laneWorld(lane, lane.gpuPoints.pcie);
-        const vram = laneWorld(lane, lane.gpuPoints.vram);
-        const gpu = laneWorld(lane, lane.gpuPoints.compute);
-        const hostResult = destinationName.includes("exact") || payloadName.includes("exact") || payloadName.includes("full")
-          ? new THREE.Vector3(4.75, 4.78, 0.08)
-          : new THREE.Vector3(-0.35, 4.78, 0.05);
-        const fullVector = payloadName.includes("full") || payloadName.includes("vector") || frame.beat === "exact-score";
-        const inputTokens = fullVector ? [exactVectors[method]] : gpuTokens[method].slice(0, 4);
-        const segmentPath = segment === "dram-pcie" ? [scratch, pcie]
-          : segment === "pcie-vram" ? [pcie, vram]
-            : segment === "vram-gpu" ? [vram, gpu] : [gpu, new THREE.Vector3(lerp(gpu.x, hostResult.x, 0.55), 2.6, 0.55), hostResult];
+        const hostPcie = laneWorld(lane, [0.65, 2.05, -0.72]);
+        const pcie = gpuWorld(lane, "pcie");
+        const controller = gpuWorld(lane, "memoryController");
+        const bankIndexes = [0];
+        const banks = bankIndexes.map((index) => gpuWorld(lane, "vramBanks", index));
+        const coreIndex = 0;
+        const core = gpuWorld(lane, "coreClusters", coreIndex);
+        const reducer = gpuWorld(lane, "reducer");
+        const resultBuffer = gpuWorld(lane, "result");
+        const exactResult = destinationName.includes("exact") || payloadName.includes("exact") || payloadName.includes("full vector") || frame.beat === "exact-score";
+        const hostResult = exactResult ? new THREE.Vector3(4.75, 4.78, 0.08) : new THREE.Vector3(-0.35, 4.78, 0.05);
+        const inputTokens = exactResult ? [exactVectors[method], gpuTokens[method][0]] : gpuTokens[method].slice(0, 3);
 
-        if (segment === "dram-pcie") {
-          setGlow(lane.scratch, colors.gpu, 0.8);
-          lane.gpuLink.material.opacity = 0.9;
-        } else if (segment === "pcie-vram") {
-          lane.vram.forEach((chip) => setGlow(chip, colors.gpu, 0.9));
+        setGlow(lane.gpuDie, colors.gpu, 0.42);
+        if (resolved.step === "host-pcie") {
+          setGlow(lane.scratch, colors.gpu, 0.85);
+          setGlow(lane.gpuAssembly.pcieEndpoint, colors.gpu, 0.75);
           lane.gpuLink.material.opacity = 0.95;
-        } else if (segment === "vram-gpu") {
-          lane.vram.forEach((chip) => setGlow(chip, colors.gpu, 0.65));
-          setGlow(lane.gpuDie, colors.gpu, 1.35);
+        } else if (resolved.step === "pcie-controller") {
+          setGlow(lane.gpuAssembly.pcieEndpoint, colors.gpu, 1.45);
+          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.25));
+          setGlow(lane.gpuAssembly.flowTraceMap.pcie, colors.gpu, 1.2);
+          lane.gpuLink.material.opacity = 1;
+        } else if (resolved.step === "controller-vram") {
+          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.1));
+          bankIndexes.forEach((index) => {
+            setGlow(lane.vram[index], colors.gpu, 1.55);
+            setGlow(lane.gpuAssembly.flowTraceMap.vram[index], colors.gpu, 1.2);
+            lane.vram[index].scale.setScalar(1 + Math.sin(local * Math.PI) * 0.06);
+          });
+        } else if (resolved.step === "vram-core") {
+          bankIndexes.forEach((index) => setGlow(lane.vram[index], colors.gpu, 1.05));
+          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.2));
+          setGlow(lane.gpuAssembly.coreClusters[coreIndex], colors.gpu, 1.75);
+          setGlow(lane.gpuAssembly.flowTraceMap.controllerCore, colors.gpu, 1.35);
+          lane.gpuAssembly.coreClusters[coreIndex].scale.setScalar(1 + Math.sin(local * Math.PI) * 0.1);
+        } else if (resolved.step === "core-result") {
+          setGlow(lane.gpuAssembly.coreClusters[coreIndex], colors.gpu, 1.45);
+          setGlow(lane.gpuAssembly.reducer, colors.gpu, 1.55);
+          setGlow(lane.gpuAssembly.resultBuffer, colors.white, 1.65);
+          setGlow(lane.gpuAssembly.flowTraceMap.coreReducer, colors.gpu, 1.35);
+          setGlow(lane.gpuAssembly.flowTraceMap.reducerResult, colors.white, 1.25);
         } else {
-          setGlow(lane.gpuDie, colors.gpu, 1.35);
-          setGlow(destinationName.includes("exact") ? hostBodies.exact : hostBodies.L, colors.gpu, 0.9);
+          setGlow(lane.gpuAssembly.resultBuffer, colors.white, 1.45);
+          setGlow(lane.gpuAssembly.pcieEndpoint, colors.gpu, 1.25);
+          setGlow(lane.gpuAssembly.flowTraceMap.pcie, colors.gpu, 1.2);
+          setGlow(exactResult ? hostBodies.exact : hostBodies.L, colors.gpu, 0.9);
+          lane.gpuLink.material.opacity = 1;
         }
 
-        if (segment === "gpu-host") {
+        if (resolved.step === "result-host") {
           const result = gpuTokens[method][4];
           result.visible = true;
-          setPathPosition(result, segmentPath, frame.progress);
+          setPathPosition(result, [resultBuffer, pcie, hostPcie, new THREE.Vector3(lerp(hostPcie.x, hostResult.x, 0.52), 3.55, 0.5), hostResult], local);
+          return;
+        }
+        if (resolved.step === "core-result") {
+          const result = gpuTokens[method][4];
+          result.visible = true;
+          setPathPosition(result, [core, reducer, resultBuffer], local);
           return;
         }
         inputTokens.forEach((token, index) => {
           token.visible = true;
-          setPathPosition(token, segmentPath, clamp(frame.progress * 1.18 - index * 0.055, 0, 1));
-          token.position.z += (index - (inputTokens.length - 1) / 2) * 0.1;
+          const bank = banks[index % banks.length];
+          const path = resolved.step === "host-pcie" ? [scratch, hostPcie]
+            : resolved.step === "pcie-controller" ? [hostPcie, pcie, controller]
+              : resolved.step === "controller-vram" ? [controller, bank]
+                : [bank, controller, core];
+          setPathPosition(token, path, clamp(local * 1.18 - index * 0.055, 0, 1));
+          token.position.z += (index - (inputTokens.length - 1) / 2) * 0.065;
         });
       });
     }
@@ -1010,6 +1180,13 @@
       applyView();
       updateGpuMode(frame.gpuActive ? "gpu-assist" : "paper");
       labelSprites.forEach((sprite) => { sprite.visible = frame.labels; });
+      const closeCpu = String(frame.cameraTarget || "").startsWith("cpu-");
+      const closeGpu = String(frame.cameraTarget || "").startsWith("gpu-");
+      Object.values(lanes).forEach((lane) => {
+        lane.cpuLabel.visible = frame.labels && !closeCpu;
+        lane.gpuLabel.visible = frame.labels && !closeGpu;
+        lane.gpuDetailLabel.visible = frame.labels && !closeGpu;
+      });
       blockBay.visible = false;
       blockBay.scale.set(1, 1, 1);
       blockBay.position.y = -0.8;
