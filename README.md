@@ -41,4 +41,4 @@ Claims tied to the paper are cited in the interface by section, figure, or table
 3. Open the **Actions** tab and let **Deploy static site to Pages** finish, or run it manually with **Run workflow**.
 4. Follow the deployment URL shown in the workflow summary. For a project repository, it normally has the form `https://OWNER.github.io/REPOSITORY/`.
 
-The workflow validates all files matching `js/*.js`, packages the repository root as a Pages artifact, and deploys only after validation succeeds. `.nojekyll` keeps GitHub Pages from applying Jekyll processing to the static asset tree.
+The workflow validates all files matching `js/*.js`, assembles only `index.html`, `css/`, `js/`, and `.nojekyll` into the Pages artifact, and deploys only after validation succeeds. `.nojekyll` keeps the published tree explicitly static.
