@@ -1090,9 +1090,11 @@ footer p { margin: 0; }
   }
   body[data-detail="research"] .learning-guide { height: min(62svh, 520px); }
   .sim-shell.guide-hidden .learning-guide {
+    height: 44px;
+    overflow: hidden;
     opacity: 1;
     pointer-events: auto;
-    transform: translateY(calc(100% - 44px));
+    transform: none;
   }
   .sim-shell.guide-hidden .guide-head,
   .sim-shell.guide-hidden .dwell,

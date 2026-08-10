@@ -51,7 +51,7 @@
         progress: completed ? 1 : current ? Math.max(0, Math.min(1, activeProgress)) : 0,
       });
     });
-    return {
+    const flow = {
       processor,
       active: opts.active !== false,
       factStatus: "illustrative",
@@ -64,13 +64,16 @@
       progress: normalized,
       activeStepIndex,
       activeStep: activeStepIndex >= 0 ? resolvedSteps[activeStepIndex] : null,
-      representativeCoreCount: 1,
-      representativeCoreId: opts.representativeCoreId,
-      coreMapping: REPRESENTATIVE_CORE_NOTE,
       route: steps.length ? [steps[0].source, ...steps.map((step) => step.destination)] : [],
       resultTarget: opts.resultTarget || null,
       steps: resolvedSteps,
     };
+    if (opts.representativeCoreId) {
+      flow.representativeCoreCount = 1;
+      flow.representativeCoreId = opts.representativeCoreId;
+      flow.coreMapping = REPRESENTATIVE_CORE_NOTE;
+    }
+    return flow;
   }
 
   function componentPresentation(flow) {
@@ -387,6 +390,98 @@
       }, flow, { componentFlow: flow });
     }
 
+    _ssdComponentSteps(paper) {
+      if (paper.beat === "request") {
+        return [
+          { id: "ssd-pcie-to-controller", source: "ssd.pcie-endpoint", destination: "ssd.controller", cameraTarget: "ssd-controller", payload: "the logical SSD read command enters a generic illustrative controller path" },
+          { id: "ssd-controller-to-command-queue", source: "ssd.controller", destination: "ssd.command-queue", cameraTarget: "ssd-command-queue", payload: "the logical SSD read command reaches an illustrative command queue; queue depth and scheduling are not modeled" },
+          { id: "ssd-command-queue-to-flash-channel", source: "ssd.command-queue", destination: "ssd.flash-channel.0", cameraTarget: "ssd-flash-channel", payload: "illustrative dispatch begins on one representative flash channel; FTL and channel mapping are not modeled, and no NAND location is claimed" },
+        ];
+      }
+      if (paper.beat === "nand-read") {
+        return [
+          { id: "ssd-flash-channel-to-nand-package", source: "ssd.flash-channel.0", destination: "ssd.nand-package.0", cameraTarget: "ssd-nand-package", payload: "the symbolic node-chunk read reaches one representative NAND package; no physical package address is claimed" },
+          { id: "ssd-nand-package-to-die", source: "ssd.nand-package.0", destination: "ssd.nand-die.0", cameraTarget: "ssd-nand-die", payload: "the requested bytes are exposed by one representative NAND die; page, plane, block, and FTL details are not traced" },
+          { id: "ssd-nand-die-to-return-buffer", source: "ssd.nand-die.0", destination: "ssd.return-buffer", cameraTarget: "ssd-return-buffer", payload: "the requested node-chunk bytes are assembled in a generic illustrative SSD return buffer" },
+        ];
+      }
+      return [];
+    }
+
+    _dramComponentSteps(paper) {
+      const payloadRegion = paper.beat === "dram-join" ? "global-pq" : "scratch";
+      const blockReturn = paper.beat === "block-return";
+      const residentPq = paper.beat === "dram-join";
+      const operation = blockReturn
+        ? "aligned logical read unit(s)"
+        : residentPq
+          ? "the logical access selected by neighbor IDs"
+          : "the logical read of neighbor IDs and inline PQ operands already held in scratch";
+      const steps = [
+        { id: "dram-input-to-package", source: "dram.input-port", destination: "dram.package.0", cameraTarget: "dram-package", payload: blockReturn ? `${operation} enters a generic illustrative DIMM package path` : `${operation} begins at an illustrative DIMM input marker; ${residentPq ? "resident PQ operands remain in DRAM and do not enter it anew" : "the hop-local bytes remain in reusable scratch"}` },
+        { id: "dram-package-to-logical-bank", source: "dram.package.0", destination: "dram.logical-bank.0", cameraTarget: "dram-bank", payload: `${operation} crosses one representative logical bank marker; row, bank, rank, and channel mapping are not modeled` },
+        { id: "dram-logical-bank-to-payload", source: "dram.logical-bank.0", destination: "dram.payload-region", cameraTarget: payloadRegion === "global-pq" ? "dram-global-pq-region" : "dram-scratch-region", payload: `${operation} reaches the logical ${payloadRegion === "global-pq" ? "global-PQ" : "scratch"} payload region; this is not a physical DRAM address claim`, payloadRegion },
+      ];
+      if (!blockReturn) {
+        steps.push({ id: "dram-payload-to-output", source: "dram.payload-region", destination: "dram.output-port", cameraTarget: "dram-output", payload: `${operation} leaves the illustrative component overlay toward the canonical CPU consumer`, payloadRegion });
+      }
+      return { payloadRegion, steps };
+    }
+
+    _storageComponentMetadata(snapshot, paper) {
+      const ssdActive = ["request", "nand-read", "block-return"].includes(paper.beat);
+      const dramActive = ["block-return", "dram-join", "inline-unpack"].includes(paper.beat);
+      if (!ssdActive && !dramActive) {
+        return {
+          active: false,
+          reason: "current paper event is outside the storage component microtrace",
+        };
+      }
+
+      const ssdSteps = this._ssdComponentSteps(paper);
+      const dram = this._dramComponentSteps(paper);
+      let processor = ssdActive ? "ssd" : "dram";
+      let steps = ssdActive ? ssdSteps : dram.steps;
+      let title = ssdActive ? "Generic SSD component path" : "Generic DRAM component path";
+      let note = ssdActive
+        ? "The canonical operation keeps its existing evidence status, while PCIe, NVMe controller and queue, flash-channel, NAND package/die, return-buffer placement, and all FTL details are illustrative."
+        : "The canonical DRAM operation keeps its existing evidence status, while DIMM package and logical-bank placement are illustrative; no row, bank, rank, channel, or physical address mapping is claimed.";
+      if (paper.beat === "block-return") {
+        processor = "storage";
+        steps = [
+          { id: "ssd-return-buffer-to-dram-input", source: "ssd.return-buffer", destination: "dram.input-port", cameraTarget: "dram-input", payload: "the already modeled logical block return crosses from the illustrative SSD return buffer into the illustrative DRAM input" },
+          ...dram.steps,
+        ];
+        title = "Generic SSD-to-DRAM component path";
+        note = "The canonical block return keeps its existing evidence status. SSD controller/queue/channel/package/die/FTL details and DRAM package/bank/address details are generic illustrative internals only.";
+      }
+      const flow = buildComponentFlow(processor, steps, paper.progress, {
+        operationFactStatus: paper.factStatus,
+        operation: paper.beat,
+        title,
+        note,
+        resultTarget: paper.destination,
+      });
+      Object.assign(flow, {
+        payloadRegion: dramActive ? dram.payloadRegion : null,
+        representativeNandPackageCount: ssdActive ? 1 : 0,
+        representativeNandPackageId: ssdActive ? "ssd.nand-package.0" : null,
+        representativeNandDieCount: ssdActive ? 1 : 0,
+        representativeNandDieId: ssdActive ? "ssd.nand-die.0" : null,
+        representativeDramPackageCount: dramActive ? 1 : 0,
+        representativeDramPackageId: dramActive ? "dram.package.0" : null,
+        representativeLogicalBankCount: dramActive ? 1 : 0,
+        representativeLogicalBankId: dramActive ? "dram.logical-bank.0" : null,
+        physicalAddressMapping: "not modeled",
+        ftlMapping: "not modeled",
+      });
+      return Object.assign({
+        active: true,
+        reason: "canonical storage operation with an illustrative component microtrace",
+        precedence: "gpu-active > storage-beat > cpu-compute",
+      }, flow, { componentFlow: flow });
+    }
+
     _gpuHardwareSnapshot(snapshot) {
       const exact = snapshot.phase && snapshot.phase.id === "record-current-vector";
       const seed = snapshot.phase && snapshot.phase.id === "seed-entrypoint";
@@ -535,8 +630,11 @@
         },
       };
       const cpu = this._cpuComponentMetadata(snapshot, paper);
+      const storage = this._storageComponentMetadata(snapshot, paper);
       paper.cpu = cpu;
-      if (cpu.active) Object.assign(paper, componentPresentation(cpu.componentFlow));
+      paper.storage = storage;
+      if (storage.active) Object.assign(paper, componentPresentation(storage.componentFlow));
+      else if (cpu.active) Object.assign(paper, componentPresentation(cpu.componentFlow));
       if (this.state.computePath !== "gpu-assist") return paper;
       const gpuPhase = snapshot.phase && ["seed-entrypoint", "compute-pq-distance", "record-current-vector"].includes(snapshot.phase.id);
       if (gpuPhase) return this._gpuHardwareSnapshot(snapshot);

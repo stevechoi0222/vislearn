@@ -67,6 +67,7 @@ require(sawExpansionState, "Trace never exposes L's expansion state");
 
 const simulation = new Simulation(content.stages);
 const observedBeats = new Set();
+const observedStorageProcessors = new Set();
 content.stages.forEach((stage, stageIndex) => {
   stage.phases.forEach((phase, phaseIndex) => {
     simulation.goToPhase(stageIndex, phaseIndex);
@@ -99,6 +100,22 @@ content.stages.forEach((stage, stageIndex) => {
       require(hardware.cpu?.representativeCoreCount === 1 && hardware.cpu?.representativeCoreId === "cpu.core.0", `${stage.id}/${phase.id} does not constrain CPU activity to one representative core cluster`);
       require(/not mapped one-to-one/i.test(hardware.cpu?.coreMapping || ""), `${stage.id}/${phase.id} CPU metadata may imply one core per neighbor`);
       require(hardware.cpu?.componentFlow?.steps?.every((step) => step.factStatus === "illustrative"), `${stage.id}/${phase.id} CPU microarchitecture is not scoped as illustrative`);
+      const storageBeat = ["request", "nand-read", "block-return", "dram-join", "inline-unpack"].includes(hardware.beat);
+      if (storageBeat) {
+        const storage = hardware.storage;
+        observedStorageProcessors.add(storage?.processor);
+        require(storage?.active && storage?.componentFlow === hardware.componentFlow, `${stage.id}/${phase.id} storage beat did not win top-level componentFlow precedence`);
+        require(storage?.operationFactStatus === hardware.factStatus && storage?.geometryStatus === "illustrative", `${stage.id}/${phase.id} conflates the canonical storage operation with illustrative geometry`);
+        require(storage?.componentFlow?.steps?.every((step) => step.factStatus === "illustrative"), `${stage.id}/${phase.id} exposes a storage internal as paper-backed`);
+        require(storage?.physicalAddressMapping === "not modeled" && storage?.ftlMapping === "not modeled", `${stage.id}/${phase.id} implies unverified DRAM address or SSD FTL mapping`);
+        require(/illustrative/i.test(hardware.componentNote || ""), `${stage.id}/${phase.id} storage microtrace lacks an illustrative scope note`);
+        if (["request", "nand-read", "block-return"].includes(hardware.beat)) {
+          require(storage?.representativeNandPackageCount === 1 && storage?.representativeNandDieCount === 1, `${stage.id}/${phase.id} does not constrain SSD activity to one representative NAND package and die`);
+        }
+        if (["block-return", "dram-join", "inline-unpack"].includes(hardware.beat)) {
+          require(storage?.representativeDramPackageCount === 1 && storage?.representativeLogicalBankCount === 1, `${stage.id}/${phase.id} does not constrain DRAM activity to one representative package and logical bank`);
+        }
+      }
       const transport = `${hardware.source} ${hardware.destination} ${hardware.payload}`;
       require(!/\bLBA\s*(?:[=:#]\s*|\s+)\d+\b/i.test(transport), `${stage.id}/${phase.id} hardware adapter leaks a numeric LBA`);
       require(!/\brequest(?:\s+id)?\s*(?:[=:#]\s*|\s+)\d+\b/i.test(transport), `${stage.id}/${phase.id} hardware adapter leaks a request ID`);
@@ -116,6 +133,7 @@ content.stages.forEach((stage, stageIndex) => {
 });
 
 allowedBeats.forEach((beat) => require(observedBeats.has(beat), `Hardware adapter never exposes ${beat}`));
+require(["ssd", "dram", "storage"].every((processor) => observedStorageProcessors.has(processor)), "Trace did not expose SSD-only, DRAM-only, and combined SSD-to-DRAM component flows");
 
 simulation.goToPhase(2, 1);
 simulation.setDataset("KILT E5 22M");
@@ -139,11 +157,38 @@ require(cpuExact.cpu?.active && cpuExact.cpu?.unit === "cpu.exact-unit", "Paper 
 require(cpuExact.cpu?.route?.join("|") === "cpu.input-port|cpu.cache.north|cpu.exact-unit|cpu.core.0|cpu.result-port", "CPU exact component route has the wrong order");
 require(cpuExact.cpu?.operationFactStatus !== "illustrative" && cpuExact.cpu?.geometryStatus === "illustrative", "CPU operation truth and illustrative geometry were not kept separate");
 
+simulation.goToPhase(2, 3);
+const dramJoinSpan = simulation.phaseSpan();
+simulation.setProgress(dramJoinSpan.start + (dramJoinSpan.end - dramJoinSpan.start) * 0.4);
+const dramJoin = simulation.hardwareSnapshot();
+require(dramJoin.beat === "dram-join" && dramJoin.cpu?.active && dramJoin.componentFlow?.processor === "dram", "DRAM join did not take componentFlow precedence over its CPU destination");
+require(dramJoin.storage?.payloadRegion === "global-pq" && dramJoin.storage?.route?.join("|") === "dram.input-port|dram.package.0|dram.logical-bank.0|dram.payload-region|dram.output-port", "DRAM global-PQ component route is incomplete");
+require(/resident PQ operands remain in DRAM and do not enter it anew/i.test(dramJoin.storage?.steps?.[0]?.payload || ""), "DRAM join incorrectly presents resident PQ operands as new DIMM ingress");
+require(dramJoin.storage?.steps?.map((step) => step.cameraTarget).join("|") === "dram-package|dram-bank|dram-global-pq-region|dram-output", "DRAM global-PQ camera targets do not follow the active destinations");
+simulation.setProgress(dramJoinSpan.start + (dramJoinSpan.end - dramJoinSpan.start) * 0.65);
+const inlineUnpack = simulation.hardwareSnapshot();
+require(inlineUnpack.beat === "inline-unpack" && inlineUnpack.cpu?.active && inlineUnpack.componentFlow?.processor === "dram", "Inline unpack did not keep DRAM componentFlow precedence over its CPU destination");
+require(inlineUnpack.storage?.payloadRegion === "scratch", "Inline unpack did not target the logical DRAM scratch payload region");
+require(/already held in scratch/i.test(inlineUnpack.storage?.steps?.[0]?.payload || ""), "Inline unpack incorrectly presents scratch-resident bytes as new DIMM ingress");
+
 simulation.goToPhase(2, 1);
 const canonicalStorageSpan = simulation.phaseSpan();
-simulation.setProgress(canonicalStorageSpan.start + (canonicalStorageSpan.end - canonicalStorageSpan.start) * 0.62);
-const canonicalStorage = simulation.hardwareSnapshot();
-require(canonicalStorage.computePath === "paper", "Canonical storage comparison fixture unexpectedly left the paper path");
+const storageProbes = [0.05, 0.27, 0.62];
+const canonicalStorage = storageProbes.map((progress) => {
+  simulation.setProgress(canonicalStorageSpan.start + (canonicalStorageSpan.end - canonicalStorageSpan.start) * progress);
+  return simulation.hardwareSnapshot();
+});
+require(canonicalStorage.every((snapshot) => snapshot.computePath === "paper"), "Canonical storage comparison fixture unexpectedly left the paper path");
+require(canonicalStorage[0].componentFlow?.processor === "ssd" && canonicalStorage[0].componentFlow?.steps?.length === 3, "Request must stop after the three-step SSD command-dispatch path");
+require(canonicalStorage[0].storage?.route?.join("|") === "ssd.pcie-endpoint|ssd.controller|ssd.command-queue|ssd.flash-channel.0", "Request component route crosses its command-dispatch boundary");
+require(!/nand-package|nand-die|return-buffer/i.test(JSON.stringify(canonicalStorage[0].componentFlow?.steps)), "Request component flow leaks into NAND access or data return");
+require(canonicalStorage[1].componentFlow?.processor === "ssd" && canonicalStorage[1].componentFlow?.steps?.length === 3, "NAND read must use the three-step package/die/return-buffer path");
+require(canonicalStorage[1].storage?.route?.join("|") === "ssd.flash-channel.0|ssd.nand-package.0|ssd.nand-die.0|ssd.return-buffer", "NAND-read component route has the wrong boundary");
+require(!/command-queue/i.test(JSON.stringify(canonicalStorage[1].componentFlow?.steps)), "NAND-read component flow replays the request command queue");
+require(canonicalStorage[2].componentFlow?.processor === "storage" && canonicalStorage[2].componentFlow?.steps?.length === 4, "Block return lacks the four-transition SSD-return-buffer-to-DRAM-scratch flow");
+require(canonicalStorage[2].storage?.route?.join("|") === "ssd.return-buffer|dram.input-port|dram.package.0|dram.logical-bank.0|dram.payload-region", "Block return component route does not end at the canonical DRAM scratch destination");
+require(!/nand-package|nand-die|flash-channel|command-queue/i.test(JSON.stringify(canonicalStorage[2].componentFlow?.steps)), "Block return component flow replays command dispatch or NAND access");
+require(!/dram\.output-port/i.test(JSON.stringify(canonicalStorage[2].componentFlow?.steps)), "Block return incorrectly moves the returned bytes out of DRAM scratch");
 
 let computeReason = null;
 const unsubscribeCompute = simulation.subscribe((state, stage, reason) => { if (reason !== "init") computeReason = reason; });
@@ -153,17 +198,15 @@ unsubscribeCompute();
 simulation.goToPhase(2, 1);
 const storageSpan = simulation.phaseSpan();
 const storageBeats = [];
-[0.05, 0.27, 0.62].forEach((progress) => {
+storageProbes.forEach((progress, probeIndex) => {
   simulation.setProgress(storageSpan.start + (storageSpan.end - storageSpan.start) * progress);
   const hardware = simulation.hardwareSnapshot();
   storageBeats.push(hardware.beat);
   require(hardware.computePath === "gpu-assist" && hardware.gpu?.active === false, "GPU assist hid or replaced a storage beat");
   require(hardware.factStatus !== "illustrative", "GPU assist relabeled a paper storage beat as illustrative");
-  if (progress === 0.62) {
-    ["beat", "source", "destination", "payload", "cameraTarget", "factStatus"].forEach((key) => {
-      require(hardware[key] === canonicalStorage[key], `GPU assist changed canonical storage field ${key}`);
-    });
-  }
+  ["beat", "source", "destination", "payload", "cameraTarget", "factStatus"].forEach((key) => {
+    require(hardware[key] === canonicalStorage[probeIndex][key], `GPU assist changed canonical storage field ${key}`);
+  });
 });
 require(storageBeats.join("|") === "request|nand-read|block-return", "GPU assist does not preserve request → NAND → block-return");
 simulation.goToPhase(3, 1);

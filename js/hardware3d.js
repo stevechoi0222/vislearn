@@ -331,6 +331,7 @@
       group.position.x = laneX;
       world.add(group);
       const isDisk = method === "diskann";
+      const componentMirror = isDisk ? -1 : 1;
 
       const chassisMat = material(0x8ea5b1, { transparent: true, opacity: 0.075, depthWrite: false, side: THREE.DoubleSide });
       const chassis = box(group, [6.7, 7.9, 3.7], [0, -0.1, 0], chassisMat);
@@ -355,124 +356,56 @@
       const cpu = cpuAssembly.body;
       const cpuLabel = label(group, "CPU · LUT / exact", [0.65, 3.12, 0.72], 2.3, "#2e2412", "#ffd978");
 
-      const scratchSlot = chamferBox(group, [2.52, 0.16, 1.58], [0.55, 0.43, 0], hardwareMaterial(0x17243e, {
-        roughness: 0.56,
-        metalness: 0.44,
-      }), "dram-slot", 0.03);
-      edges(group, scratchSlot, 0x6383c7, 0.5);
-      const scratch = chamferBox(group, [2.25, 0.55, 1.35], [0.55, 0.75, 0], hardwareMaterial(colors.dram, {
-        roughness: 0.32,
-        metalness: 0.25,
-        clearcoat: 0.46,
-        transparent: true,
-        opacity: 0.82,
-        emissive: colors.dramDeep,
-        emissiveIntensity: 0.12,
-      }), "scratch", 0.055);
-      edges(group, scratch, 0xa8c0ff, 0.88);
-      const scratchChips = [];
-      for (let index = 0; index < 5; index += 1) {
-        scratchChips.push(chamferBox(group, [0.31, 0.075, 0.82], [-0.17 + index * 0.36, 1.065, 0], hardwareMaterial(0x173d88, {
-          roughness: 0.4,
-          metalness: 0.34,
-          clearcoat: 0.24,
-          transparent: true,
-          opacity: 0.86,
-          emissive: colors.dramDeep,
-          emissiveIntensity: 0.04,
-        }), "dram-chip", 0.018));
-      }
-      label(group, "DRAM · reusable scratch", [0.55, 1.19, 0.77], 2.7, "#14265b", "#eaf0ff");
+      const dramScratchAssembly = componentFactory.createDramAssembly(group, {
+        idPrefix: `${method}.scratch`,
+        position: [0.82, 0.78, 0.16],
+      });
+      dramScratchAssembly.group.scale.setScalar(0.78);
+      const scratch = dramScratchAssembly.body;
+      const scratchChips = dramScratchAssembly.memoryPackages;
+      const dramScratchLabel = label(group, "DRAM · reusable scratch", [0.82, 1.3, 0.62], 2.2, "#14265b", "#eaf0ff");
 
-      const pqBank = new THREE.Group();
-      const pqCells = [];
-      pqBank.position.set(-2.05, 0.75, 0);
-      group.add(pqBank);
-      const pqBackplane = chamferBox(pqBank, [1.95, 1.72, 0.14], [0, 0, -0.5], hardwareMaterial(0x1b2943, {
-        roughness: 0.56,
-        metalness: 0.35,
-      }), "pq-backplane", 0.025);
-      edges(pqBank, pqBackplane, 0x60769d, 0.42);
-      for (let index = 0; index < (isDisk ? 8 : 2); index += 1) {
-        const column = index % 4;
-        const row = Math.floor(index / 4);
-        const activeCell = index < (isDisk ? 8 : 1);
-        pqCells.push(chamferBox(
-          pqBank,
-          [0.35, 0.7, 0.85],
-          [(column - 1.5) * 0.43, row * 0.78 - 0.38, 0],
-          hardwareMaterial(activeCell ? colors.pq : colors.steel, {
-            roughness: 0.3,
-            metalness: 0.42,
-            clearcoat: 0.34,
-            emissive: activeCell ? colors.pq : colors.steel,
-            emissiveIntensity: 0.04,
-          }),
-          "pq-cell",
-          0.035
-        ));
-      }
-      label(group, isDisk ? "DRAM · GLOBAL PQ[N]" : "DRAM · n_ep seed only", [-2.05, 1.52, 0.72], 2.45, "#14265b", "#f7e88e");
+      const pqDramAssembly = componentFactory.createDramAssembly(group, {
+        idPrefix: `${method}.pq`,
+        position: [-1.78, 0.78, 0.12],
+      });
+      pqDramAssembly.group.scale.setScalar(0.68);
+      pqDramAssembly.payloadOverlay.material.color.setHex(isDisk ? colors.pq : colors.steel);
+      pqDramAssembly.payloadOverlay.material.emissive.setHex(isDisk ? colors.pq : colors.steel);
+      pqDramAssembly.logicalBanks.forEach((bank, index) => {
+        const representative = index === 0;
+        bank.material.color.setHex(representative ? colors.pq : colors.steel);
+        bank.material.emissive.setHex(representative ? colors.pq : colors.steel);
+        bank.material.opacity = representative ? 0.72 : 0.22;
+      });
+      const pqBank = pqDramAssembly.group;
+      const pqCells = pqDramAssembly.logicalBanks;
+      const dramPqLabel = label(group, isDisk ? "DRAM · GLOBAL PQ[N]" : "DRAM · n_ep seed", [-1.78, 1.27, 0.58], 2.05, "#14265b", "#f7e88e");
 
-      const pcie = lineBetween(group, [0.65, 2.02, -0.25], [0.55, -1.4, -0.25], colors.request, 0.055, 0.62);
+      const ssdAssembly = componentFactory.createSsdAssembly(group, {
+        idPrefix: method,
+        mirror: componentMirror,
+        position: [0.3, -2.16, 0.18],
+      });
+      const controller = ssdAssembly.controller;
+      const nand = ssdAssembly.group;
+      const nandChips = ssdAssembly.nandPackages;
+      const ssdLabel = label(group, "SSD · NVMe / NAND cutaway", [0.3, -1.42, 0.62], 2.55, "#10332f", "#a8fff4");
+      const ssdPcieAnchor = ssdAssembly.anchors.pcie;
+      const ssdPciePoint = [
+        ssdAssembly.group.position.x + ssdPcieAnchor[0],
+        ssdAssembly.group.position.y + ssdPcieAnchor[1],
+        ssdAssembly.group.position.z + ssdPcieAnchor[2],
+      ];
+      const pcie = lineBetween(group, [0.65, 2.02, -0.25], ssdPciePoint, colors.request, 0.055, 0.62);
       pcie.name = "pcie-nvme";
       label(group, "PCIe / NVMe", [1.2, -0.2, 0.7], 1.9, "#3b2c13", "#ffd56f");
-
-      const controllerBoard = chamferBox(group, [2.82, 0.14, 1.72], [0.55, -1.75, 0], hardwareMaterial(0x173934, {
-        roughness: 0.58,
-        metalness: 0.24,
-      }), "controller-board", 0.025);
-      edges(group, controllerBoard, 0x3a7f75, 0.45);
-      const controller = chamferBox(group, [2.4, 0.48, 1.35], [0.55, -1.45, 0], hardwareMaterial(colors.ssdDeep, {
-        roughness: 0.31,
-        metalness: 0.38,
-        clearcoat: 0.42,
-        emissive: colors.ssdDeep,
-        emissiveIntensity: 0.08,
-      }), "controller", 0.055);
-      edges(group, controller, 0x5de1d2, 0.82);
-      const controllerCap = chamferBox(group, [1.35, 0.085, 0.82], [0.55, -1.165, 0], hardwareMaterial(colors.ssd, {
-        roughness: 0.25,
-        metalness: 0.54,
-        clearcoat: 0.45,
-      }), "controller-cap", 0.025);
-      edges(group, controllerCap, 0x9ff8ec, 0.46);
-      label(group, "SSD controller", [0.55, -1.03, 0.78], 2.15, "#10332f", "#9ff8ec");
-
-      const nand = new THREE.Group();
-      const nandChips = [];
-      nand.position.set(0.3, -2.85, 0);
-      group.add(nand);
-      const nandBoard = chamferBox(nand, [5.35, 0.14, 1.43], [0, -0.32, 0], hardwareMaterial(0x153a34, {
-        roughness: 0.6,
-        metalness: 0.2,
-      }), "nand-board", 0.025);
-      edges(nand, nandBoard, 0x3f8c80, 0.46);
-      for (let index = 0; index < 4; index += 1) {
-        const chipX = (index - 1.5) * 1.3;
-        const chip = chamferBox(nand, [1.15, 0.52, 1.05], [chipX, 0, 0], hardwareMaterial(0x168a80, {
-          roughness: 0.3,
-          metalness: 0.34,
-          clearcoat: 0.4,
-          emissive: colors.ssdDeep,
-          emissiveIntensity: 0.06,
-        }), "nand-chip", 0.055);
-        nandChips.push(chip);
-        edges(nand, chip, 0x8ff4e7, 0.75);
-        chamferBox(nand, [0.78, 0.075, 0.68], [chipX, 0.298, 0], hardwareMaterial(colors.ssd, {
-          roughness: 0.25,
-          metalness: 0.48,
-          clearcoat: 0.46,
-        }), "nand-cap", 0.022);
-      }
-      label(group, "SSD · NAND packages", [0.3, -2.35, 0.72], 2.75, "#10332f", "#a8fff4");
 
       const ssdCopy = packet(group, isDisk ? [2.3, 0.42, 0.78] : [3.15, 0.42, 0.78], colors.returnBlock, "4 KB node copy");
       ssdCopy.position.set(0.3, -3.48, 0.8);
       const pqStripe = box(ssdCopy, [isDisk ? 0.03 : 1.05, 0.46, 0.82], [isDisk ? 1.2 : 0.88, 0, 0], material(isDisk ? colors.steel : colors.pq));
       pqStripe.visible = !isDisk;
 
-      const componentMirror = isDisk ? -1 : 1;
       const gpuGroupX = isDisk ? 1.75 : -1.75;
       const gpuGroupY = -0.2;
       const gpuGroupZ = 1.28;
@@ -504,7 +437,14 @@
       };
       const gpuLink = lineBetween(group, [0.65, 2.05, -0.72], gpuPoints.link, colors.gpuDim, 0.045, 0.35);
 
-      return { method, group, chassis, board, cpu, cpuAssembly, cpuLabel, scratch, scratchChips, pqBank, pqCells, pcie, controller, nand, nandChips, ssdCopy, gpuGroup, gpuAssembly, gpuLabel, gpuDetailLabel, gpuBoard, gpuDie, gpuDieCap, vram, vramCaps, gpuLink, gpuPoints };
+      return {
+        method, group, chassis, board,
+        cpu, cpuAssembly, cpuLabel,
+        scratch, scratchChips, dramScratchAssembly, dramScratchLabel,
+        pqBank, pqCells, pqDramAssembly, dramPqLabel,
+        pcie, controller, nand, nandChips, ssdAssembly, ssdLabel, ssdCopy,
+        gpuGroup, gpuAssembly, gpuLabel, gpuDetailLabel, gpuBoard, gpuDie, gpuDieCap, vram, vramCaps, gpuLink, gpuPoints,
+      };
     }
 
     const lanes = {
@@ -535,12 +475,14 @@
     const exactVectors = {};
     const cpuTokens = { diskann: [], aisaq: [] };
     const gpuTokens = { diskann: [], aisaq: [] };
+    const storageTokens = { diskann: [], aisaq: [] };
     ["diskann", "aisaq"].forEach((method) => {
       for (let index = 0; index < 4; index += 1) scalarTokens[method].push(packet(dynamic, [0.34, 0.25, 0.38], colors.white, index === 0 ? "d" : ""));
       queueTokens[method] = packet(dynamic, [1.15, 0.42, 0.55], colors.white, "ID + scalar");
       exactVectors[method] = packet(dynamic, [1.25, 0.48, 0.68], colors.vector, "full vector");
       for (let index = 0; index < 3; index += 1) cpuTokens[method].push(packet(dynamic, [0.22, 0.18, 0.22], index === 0 ? colors.pq : colors.cpu, ""));
       for (let index = 0; index < 5; index += 1) gpuTokens[method].push(packet(dynamic, [0.18, 0.18, 0.18], index < 4 ? colors.pq : colors.white, ""));
+      for (let index = 0; index < 3; index += 1) storageTokens[method].push(packet(dynamic, [0.2, 0.16, 0.2], colors.returnBlock, ""));
     });
 
     const blockBay = new THREE.Group();
@@ -672,6 +614,8 @@
         componentTitle: hardware.componentTitle || activeComponentStep?.title || componentFlow?.title || "",
         componentNote: hardware.componentNote || activeComponentStep?.note || componentFlow?.note || "",
         componentPayload: hardware.componentPayload || activeComponentStep?.payload || componentFlow?.payload || "",
+        componentProcessor: String(componentFlow?.processor || "").toLowerCase(),
+        payloadRegion: activeComponentStep?.payloadRegion || componentFlow?.payloadRegion || null,
         activeComponents: Array.isArray(hardware.activeComponents)
           ? hardware.activeComponents
           : Array.isArray(componentFlow?.activeComponents) ? componentFlow.activeComponents : [],
@@ -702,9 +646,47 @@
       const point = Array.isArray(points?.[0]) ? points[index == null ? 0 : index] : points;
       return laneWorld(lane, point);
     }
+    function objectWorld(object) {
+      if (!object) return null;
+      return object.getWorldPosition(new THREE.Vector3());
+    }
+    function dramAssemblyFor(frame, lane) {
+      return frame.payloadRegion === "global-pq" ? lane.pqDramAssembly : lane.dramScratchAssembly;
+    }
+    function dramAddressObject(frame, lane, address) {
+      const assembly = dramAssemblyFor(frame, lane);
+      const value = String(address || "").toLowerCase();
+      if (value.includes("input-port")) return assembly.inputPort;
+      if (value.includes("package")) return assembly.memoryPackages[0];
+      if (value.includes("logical-bank")) return assembly.logicalBanks[0];
+      if (value.includes("payload-region")) return assembly.payloadOverlay;
+      if (value.includes("output-port")) return assembly.outputPort;
+      return assembly.payloadOverlay;
+    }
+    function ssdAddressObject(lane, address) {
+      const assembly = lane.ssdAssembly;
+      const value = String(address || "").toLowerCase();
+      if (value.includes("pcie-endpoint")) return assembly.pcieEndpoint;
+      if (value.includes("command-queue")) return assembly.commandQueue;
+      if (value.includes("flash-channel")) return assembly.flashChannels[0];
+      if (value.includes("nand-package")) return assembly.nandPackages[0];
+      if (value.includes("nand-die")) return assembly.nandDies[0];
+      if (value.includes("return-buffer")) return assembly.returnBuffer;
+      if (value.includes("controller")) return assembly.controller;
+      return assembly.controller;
+    }
+    function componentAddressObject(frame, lane, address) {
+      const value = String(address || "").toLowerCase();
+      if (value.includes("ssd.")) return ssdAddressObject(lane, value);
+      if (value.includes("dram.")) return dramAddressObject(frame, lane, value);
+      return null;
+    }
     function resetDynamicVisibility() {
       Object.values(requestPulses).forEach((pulse) => { pulse.visible = false; });
-      Object.values(returnBlocks).forEach((block) => { block.visible = false; });
+      Object.values(returnBlocks).forEach((block) => {
+        block.visible = false;
+        block.scale.setScalar(1);
+      });
       Object.values(scanPlanes).forEach((plane) => { plane.visible = false; });
       Object.values(nandVoxels).flat().forEach((voxel) => { voxel.visible = false; });
       pqFragments.forEach((fragment) => { fragment.visible = false; });
@@ -713,6 +695,7 @@
       Object.values(exactVectors).forEach((token) => { token.visible = false; });
       Object.values(cpuTokens).flat().forEach((token) => { token.visible = false; });
       Object.values(gpuTokens).flat().forEach((token) => { token.visible = false; });
+      Object.values(storageTokens).flat().forEach((token) => { token.visible = false; });
     }
     function applyView() {
       lanes.diskann.group.visible = view !== "aisaq";
@@ -745,12 +728,34 @@
         setGlow(lane.cpuAssembly.inputPort, colors.dram, 0.08);
         setGlow(lane.cpuAssembly.resultPort, colors.white, 0.05);
         lane.cpuAssembly.flowTraces.forEach((trace) => setGlow(trace, colors.cpuDeep, 0));
-        setGlow(lane.scratch, colors.dramDeep, 0.12);
-        lane.scratch.material.opacity = 0.82;
-        lane.scratchChips.forEach((chip) => { chip.material.opacity = 0.86; });
+        [lane.dramScratchAssembly, lane.pqDramAssembly].forEach((assembly) => {
+          assembly.memoryPackages.forEach((entry, index) => {
+            setGlow(entry, colors.dramDeep, index === 0 ? 0.035 : 0.012);
+            entry.scale.setScalar(1);
+          });
+          assembly.logicalBanks.forEach((entry, index) => {
+            const pqRegion = assembly === lane.pqDramAssembly;
+            const activePqCell = index === 0;
+            const regionColor = pqRegion && !activePqCell ? colors.steel : pqRegion ? colors.pq : colors.dram;
+            setGlow(entry, regionColor, pqRegion ? (activePqCell ? 0.04 : 0.005) : 0.08);
+            if (pqRegion) entry.material.opacity = activePqCell ? 0.72 : 0.22;
+            entry.scale.setScalar(1);
+          });
+          setGlow(assembly.inputPort, colors.dram, 0.08);
+          setGlow(assembly.outputPort, colors.dram, 0.04);
+          setGlow(assembly.payloadOverlay, assembly === lane.pqDramAssembly ? colors.pq : colors.dram, 0.12);
+          assembly.payloadOverlay.material.opacity = 0.16;
+          assembly.flowTraces.forEach((trace) => setGlow(trace, colors.dram, 0));
+        });
         setGlow(lane.controller, colors.ssdDeep, 0.08);
-        lane.nandChips.forEach((chip) => setGlow(chip, colors.ssdDeep, 0.06));
-        lane.pqCells.forEach((cell) => setGlow(cell, colors.pq, 0.04));
+        lane.nandChips.forEach((chip, index) => setGlow(chip, colors.ssdDeep, index === 0 ? 0.06 : 0.015));
+        setGlow(lane.ssdAssembly.pcieEndpoint, colors.request, 0.06);
+        setGlow(lane.ssdAssembly.commandQueue, colors.request, 0.07);
+        lane.ssdAssembly.flashChannels.forEach((entry) => setGlow(entry, colors.ssd, 0.04));
+        lane.ssdAssembly.nandDies.forEach((entry, index) => setGlow(entry, colors.ssd, index === 0 ? 0.05 : 0.015));
+        setGlow(lane.ssdAssembly.returnBuffer, colors.returnBlock, 0.08);
+        lane.ssdAssembly.flowTraces.forEach((trace) => setGlow(trace, colors.ssdDeep, 0));
+        [...lane.ssdAssembly.nandPackages, ...lane.ssdAssembly.nandDies].forEach((entry) => entry.scale.setScalar(1));
         lane.ssdCopy.scale.set(1, 1, 1);
         lane.gpuAssembly.coreClusters.forEach((cluster) => {
           setGlow(cluster, colors.gpu, 0.02);
@@ -775,9 +780,9 @@
         lane.vram.forEach((chip) => chip.material.color.setHex(active ? 0x7054b3 : colors.gpuDim));
         lane.vramCaps.forEach((chip) => chip.material.color.setHex(active ? 0x9c83dc : 0x494361));
         setGlow(lane.gpuDie, colors.gpu, active ? 0.35 : 0.02);
-        lane.vram.forEach((chip) => setGlow(chip, colors.gpu, active ? 0.16 : 0));
-        lane.gpuAssembly.coreClusters.forEach((cluster) => setGlow(cluster, colors.gpu, active ? 0.1 : 0.02));
-        lane.gpuAssembly.memoryControllers.forEach((controller) => setGlow(controller, colors.returnBlock, active ? 0.12 : 0.025));
+        lane.vram.forEach((chip, index) => setGlow(chip, colors.gpu, active && index === 0 ? 0.16 : 0.02));
+        lane.gpuAssembly.coreClusters.forEach((cluster, index) => setGlow(cluster, colors.gpu, active && index === 0 ? 0.1 : 0.02));
+        lane.gpuAssembly.memoryControllers.forEach((controller, index) => setGlow(controller, colors.returnBlock, active && index === 0 ? 0.12 : 0.025));
         lane.gpuLink.material.color.setHex(active ? colors.gpu : colors.gpuDim);
         lane.gpuLink.material.opacity = active ? 0.72 : 0.2;
       });
@@ -799,6 +804,17 @@
         const total = methods.reduce((sum, method) => sum.add(gpuWorld(lanes[method], key)), new THREE.Vector3());
         return total.multiplyScalar(1 / methods.length);
       };
+      const averageSsdPoint = (address) => {
+        if (!methods.length) return new THREE.Vector3(0, -2.16, 0.4);
+        const total = methods.reduce((sum, method) => sum.add(objectWorld(ssdAddressObject(lanes[method], address))), new THREE.Vector3());
+        return total.multiplyScalar(1 / methods.length);
+      };
+      const averageDramPoint = (address, payloadRegion) => {
+        if (!methods.length) return new THREE.Vector3(0, 0.78, 0.4);
+        const focusFrame = Object.assign({}, frame, { payloadRegion });
+        const total = methods.reduce((sum, method) => sum.add(objectWorld(dramAddressObject(focusFrame, lanes[method], address))), new THREE.Vector3());
+        return total.multiplyScalar(1 / methods.length);
+      };
       const cpuPackagePoint = averageCpuPoint("package");
       const cpuLutPoint = averageCpuPoint("lut");
       const cpuExactPoint = averageCpuPoint("exact");
@@ -809,14 +825,40 @@
       const gpuVramPoint = averageGpuPoint("vram");
       const gpuComputePoint = averageGpuPoint("compute");
       const gpuResultPoint = averageGpuPoint("result");
+      const ssdPciePoint = averageSsdPoint("ssd.pcie-endpoint");
+      const ssdControllerPoint = averageSsdPoint("ssd.controller");
+      const ssdQueuePoint = averageSsdPoint("ssd.command-queue");
+      const ssdChannelPoint = averageSsdPoint("ssd.flash-channel.0");
+      const ssdPackagePoint = averageSsdPoint("ssd.nand-package.0");
+      const ssdDiePoint = averageSsdPoint("ssd.nand-die.0");
+      const ssdReturnPoint = averageSsdPoint("ssd.return-buffer");
+      const dramInputPoint = averageDramPoint("dram.input-port", frame.payloadRegion || "scratch");
+      const dramPackagePoint = averageDramPoint("dram.package.0", frame.payloadRegion || "scratch");
+      const dramBankPoint = averageDramPoint("dram.logical-bank.0", frame.payloadRegion || "scratch");
+      const dramScratchPoint = averageDramPoint("dram.payload-region", "scratch");
+      const dramPqPoint = averageDramPoint("dram.payload-region", "global-pq");
+      const dramOutputPoint = averageDramPoint("dram.output-port", frame.payloadRegion || "scratch");
       const cpuDistance = methods.length > 1 ? 11.4 : 7.8;
       const gpuDistance = methods.length > 1 ? 11.4 : 7.9;
+      const storageDistance = methods.length > 1 ? 11.2 : 7.7;
       const targets = {
         overview: { point: [0, 0.65, 0], distance: 18 },
-        "ssd-controller": { point: [laneX + 0.55, -1.45, 0], distance: 10.3 },
-        "ssd-nand": { point: [laneX + 0.3, -2.75, 0], distance: 10.4 },
-        "dram-scratch": { point: [laneX + 0.55, 0.75, 0], distance: 10.6 },
-        "dram-pq-array": { point: [laneX - 2.05, 0.75, 0], distance: 10.8 },
+        "ssd-controller": { point: [ssdControllerPoint.x, ssdControllerPoint.y, ssdControllerPoint.z], distance: storageDistance },
+        "ssd-nand": { point: [ssdPackagePoint.x, ssdPackagePoint.y, ssdPackagePoint.z], distance: storageDistance },
+        "ssd-pcie": { point: [ssdPciePoint.x, ssdPciePoint.y, ssdPciePoint.z], distance: storageDistance },
+        "ssd-command-queue": { point: [ssdQueuePoint.x, ssdQueuePoint.y, ssdQueuePoint.z], distance: storageDistance - 0.2 },
+        "ssd-flash-channel": { point: [ssdChannelPoint.x, ssdChannelPoint.y, ssdChannelPoint.z], distance: storageDistance - 0.2 },
+        "ssd-nand-package": { point: [ssdPackagePoint.x, ssdPackagePoint.y, ssdPackagePoint.z], distance: storageDistance - 0.3 },
+        "ssd-nand-die": { point: [ssdDiePoint.x, ssdDiePoint.y, ssdDiePoint.z], distance: storageDistance - 0.4 },
+        "ssd-return-buffer": { point: [ssdReturnPoint.x, ssdReturnPoint.y, ssdReturnPoint.z], distance: storageDistance - 0.2 },
+        "dram-scratch": { point: [dramScratchPoint.x, dramScratchPoint.y, dramScratchPoint.z], distance: storageDistance },
+        "dram-pq-array": { point: [dramPqPoint.x, dramPqPoint.y, dramPqPoint.z], distance: storageDistance },
+        "dram-input": { point: [dramInputPoint.x, dramInputPoint.y, dramInputPoint.z], distance: storageDistance },
+        "dram-package": { point: [dramPackagePoint.x, dramPackagePoint.y, dramPackagePoint.z], distance: storageDistance - 0.2 },
+        "dram-bank": { point: [dramBankPoint.x, dramBankPoint.y, dramBankPoint.z], distance: storageDistance - 0.3 },
+        "dram-scratch-region": { point: [dramScratchPoint.x, dramScratchPoint.y, dramScratchPoint.z], distance: storageDistance - 0.3 },
+        "dram-global-pq-region": { point: [dramPqPoint.x, dramPqPoint.y, dramPqPoint.z], distance: storageDistance - 0.3 },
+        "dram-output": { point: [dramOutputPoint.x, dramOutputPoint.y, dramOutputPoint.z], distance: storageDistance },
         "cpu-package": { point: [cpuPackagePoint.x, cpuPackagePoint.y, cpuPackagePoint.z], distance: cpuDistance + 0.8 },
         "cpu-cache": { point: [cpuPackagePoint.x, cpuPackagePoint.y, cpuPackagePoint.z], distance: cpuDistance },
         "cpu-lut": { point: [cpuLutPoint.x, cpuLutPoint.y, cpuLutPoint.z], distance: cpuDistance },
@@ -872,15 +914,105 @@
         setGlow(lane.pqCells[Math.floor(frame.progress * lane.pqCells.length) % lane.pqCells.length], colors.pq, 0.9);
       });
     }
+    function storageFlowTrace(frame, lane, source, destination) {
+      const from = String(source || "").toLowerCase();
+      const to = String(destination || "").toLowerCase();
+      if (from.includes("ssd.pcie-endpoint") && to.includes("ssd.controller")) return [lane.ssdAssembly.flowTraceMap.pcieInput];
+      if (from.includes("ssd.controller") && to.includes("ssd.command-queue")) return [lane.ssdAssembly.flowTraceMap.commandQueue];
+      if (from.includes("ssd.command-queue")) return [lane.ssdAssembly.flowTraceMap.flashChannels[0]];
+      if (from.includes("ssd.flash-channel")) {
+        return [lane.ssdAssembly.flowTraceMap.flashChannels[2] || lane.ssdAssembly.flowTraceMap.flashChannels[0]];
+      }
+      if (from.includes("ssd.nand-die") && to.includes("ssd.return-buffer")) return [lane.ssdAssembly.flowTraceMap.nandReturn[0]];
+      if (from.includes("ssd.return-buffer") && to.includes("dram.input-port")) {
+        return [lane.ssdAssembly.flowTraceMap.returnPcie, lane.dramScratchAssembly.flowTraceMap.input];
+      }
+      const assembly = dramAssemblyFor(frame, lane);
+      if (from.includes("dram.input-port")) return [assembly.flowTraceMap.input];
+      if (from.includes("dram.package") || from.includes("dram.logical-bank")) return [assembly.flowTraceMap.banks[0]];
+      if (from.includes("dram.payload-region")) return [assembly.flowTraceMap.output];
+      return [];
+    }
+    function glowStorageAddress(frame, lane, address, intensity, local) {
+      const value = String(address || "").toLowerCase();
+      const object = componentAddressObject(frame, lane, value);
+      if (!object) return;
+      const color = value.includes("return-buffer") || value.includes("dram.input")
+        ? colors.returnBlock
+        : value.includes("dram.")
+          ? (frame.payloadRegion === "global-pq" ? colors.pq : colors.dram)
+          : value.includes("pcie") || value.includes("controller") || value.includes("command-queue")
+            ? colors.request : colors.ssd;
+      setGlow(object, color, intensity);
+      if (/package|nand-die|logical-bank/.test(value)) object.scale.setScalar(1 + Math.sin(local * Math.PI) * 0.07);
+    }
+    function updateStorageComponentFlow(frame) {
+      const sourceName = String(frame.source || "").toLowerCase();
+      const destinationName = String(frame.destination || "").toLowerCase();
+      if (!sourceName.includes("ssd.") && !sourceName.includes("dram.")
+        && !destinationName.includes("ssd.") && !destinationName.includes("dram.")) return false;
+      const local = clamp(frame.componentProgress, 0, 1);
+      const logicalDramAccess = ["dram-join", "inline-unpack"].includes(frame.beat);
+      const payloadEgress = logicalDramAccess
+        && sourceName.includes("dram.payload-region")
+        && destinationName.includes("dram.output-port");
+      methodsFor(frame).forEach((method) => {
+        const lane = lanes[method];
+        const sourceObject = componentAddressObject(frame, lane, sourceName);
+        const destinationObject = componentAddressObject(frame, lane, destinationName);
+        const source = objectWorld(sourceObject);
+        const destination = objectWorld(destinationObject);
+        if (!source || !destination) return;
+        const midpoint = source.clone().lerp(destination, 0.5);
+        midpoint.z += Math.min(0.75, 0.22 + source.distanceTo(destination) * 0.08);
+        const path = source.distanceTo(destination) > 1.15 ? [source, midpoint, destination] : [source, destination];
+
+        glowStorageAddress(frame, lane, sourceName, 0.8, local);
+        glowStorageAddress(frame, lane, destinationName, 1.15 + Math.sin(local * Math.PI) * 0.55, local);
+        const dramSegment = sourceName.includes("dram.") || destinationName.includes("dram.");
+        const returnCrossing = sourceName.includes("ssd.return-buffer") && destinationName.includes("dram.input-port");
+        const traceColor = returnCrossing
+          ? colors.returnBlock
+          : logicalDramAccess && !payloadEgress
+            ? colors.request
+            : dramSegment
+              ? (frame.payloadRegion === "global-pq" ? colors.pq : colors.dram)
+              : colors.ssd;
+        storageFlowTrace(frame, lane, sourceName, destinationName).forEach((trace) => {
+          setGlow(trace, traceColor, 1.2);
+        });
+
+        if (sourceName.includes("ssd.return-buffer") && destinationName.includes("dram.input-port")) {
+          const block = returnBlocks[method];
+          block.visible = true;
+          block.scale.setScalar(0.52);
+          setPathPosition(block, path, local);
+          return;
+        }
+
+        const tokens = frame.beat === "request" || (logicalDramAccess && !payloadEgress)
+          ? [requestPulses[method]]
+          : payloadEgress
+            ? pqFragments.slice(method === "diskann" ? 0 : 5, method === "diskann" ? 3 : 8)
+            : storageTokens[method];
+        tokens.forEach((token, index) => {
+          token.visible = true;
+          setPathPosition(token, path, clamp(local * 1.16 - index * 0.07, 0, 1));
+          token.position.z += (index - (tokens.length - 1) / 2) * 0.055;
+        });
+      });
+      return true;
+    }
     function updateRequest(frame) {
       methodsFor(frame).forEach((method) => {
         const lane = lanes[method];
         const pulse = requestPulses[method];
         pulse.visible = true;
         setPathPosition(pulse, [
-          laneWorld(lane, [0.65, 2.35, 0.6]),
+          cpuWorld(lane, "result"),
           laneWorld(lane, [0.6, 0.1, 0.5]),
-          laneWorld(lane, [0.55, -1.45, 0.6]),
+          objectWorld(lane.ssdAssembly.pcieEndpoint),
+          objectWorld(lane.ssdAssembly.controller),
         ], frame.progress);
         setGlow(lane.controller, colors.request, 0.35 + frame.progress * 0.8);
       });
@@ -893,8 +1025,8 @@
         });
         nandVoxels[method].forEach((voxel, index) => {
           const chipIndex = index % lane.nandChips.length;
-          const source = laneWorld(lane, [0.3 + (chipIndex - 1.5) * 1.3, -2.85, 0.65]);
-          const target = laneWorld(lane, [0.55 + (index % 4 - 1.5) * 0.31, -2.0 + Math.floor(index / 4) * 0.31, 0.78]);
+          const source = objectWorld(lane.ssdAssembly.nandDies[chipIndex * 2]);
+          const target = objectWorld(lane.ssdAssembly.returnBuffer);
           const local = clamp(frame.progress * 1.35 - index * 0.045, 0, 1);
           voxel.visible = local > 0;
           setPathPosition(voxel, [source, target], local);
@@ -907,9 +1039,10 @@
         const block = returnBlocks[method];
         block.visible = true;
         setPathPosition(block, [
-          laneWorld(lane, [0.55, -1.45, 0.85]),
+          objectWorld(lane.ssdAssembly.returnBuffer),
           laneWorld(lane, [0.55, -0.15, 1.1]),
-          laneWorld(lane, [0.55, 0.75, 0.8]),
+          objectWorld(lane.dramScratchAssembly.inputPort),
+          objectWorld(lane.dramScratchAssembly.payloadOverlay),
         ], frame.progress);
         setGlow(lane.scratch, colors.returnBlock, 0.2 + frame.progress);
       });
@@ -918,7 +1051,7 @@
       if ((view === "diskann" && method !== "diskann") || (view === "aisaq" && method !== "aisaq")) return;
       const lane = lanes[method];
       const offset = method === "diskann" ? 0 : 5;
-      const source = inline ? laneWorld(lane, [0.55, 0.75, 0.65]) : laneWorld(lane, [-2.05, 0.75, 0.65]);
+      const source = objectWorld(inline ? lane.dramScratchAssembly.outputPort : lane.pqDramAssembly.outputPort);
       const target = cpuWorld(lane, "input");
       for (let index = 0; index < 5; index += 1) {
         const fragment = pqFragments[offset + index];
@@ -944,8 +1077,8 @@
       const source = String(frame.source || "").toLowerCase();
       if (source.includes("host.query") || source.endsWith(".q")) return new THREE.Vector3(-5.05, 4.78, 0.05);
       if (source.includes("centroid") || source.includes("host.lut")) return new THREE.Vector3(-3, 4.78, 0.05);
-      if (source.includes("pq-array") || (method === "diskann" && !exact && !source.includes("scratch"))) return laneWorld(lane, [-2.05, 0.75, 0.65]);
-      return laneWorld(lane, [0.55, 0.75, 0.72]);
+      if (source.includes("pq-array") || (method === "diskann" && !exact && !source.includes("scratch"))) return objectWorld(lane.pqDramAssembly.outputPort);
+      return objectWorld(lane.dramScratchAssembly.outputPort);
     }
     function updateCpuComponentFlow(frame, method, exact) {
       const lane = lanes[method];
@@ -1033,8 +1166,11 @@
         const lane = lanes[method];
         const scratch = lane.scratch;
         const release = smooth(clamp(frame.progress / 0.72, 0, 1));
-        scratch.material.opacity = lerp(0.82, 0.055, release);
-        lane.scratchChips.forEach((chip) => { chip.material.opacity = lerp(0.86, 0.08, release); });
+        scratch.material.opacity = lerp(0.16, 0.035, release);
+        lane.scratchChips.forEach((chip, index) => {
+          setGlow(chip, colors.returnBlock, lerp(0.18, 0, release));
+          chip.scale.setScalar(1 - release * (0.025 + index * 0.002));
+        });
         setGlow(scratch, colors.returnBlock, lerp(0.55, 0, frame.progress));
       });
     }
@@ -1074,7 +1210,7 @@
       const payloadName = typeof payloadValue === "string" ? payloadValue.toLowerCase() : JSON.stringify(payloadValue).toLowerCase();
       methods.forEach((method) => {
         const lane = lanes[method];
-        const scratch = laneWorld(lane, [0.55, 0.75, 0.72]);
+        const scratch = objectWorld(lane.dramScratchAssembly.outputPort);
         const hostPcie = laneWorld(lane, [0.65, 2.05, -0.72]);
         const pcie = gpuWorld(lane, "pcie");
         const controller = gpuWorld(lane, "memoryController");
@@ -1095,11 +1231,11 @@
           lane.gpuLink.material.opacity = 0.95;
         } else if (resolved.step === "pcie-controller") {
           setGlow(lane.gpuAssembly.pcieEndpoint, colors.gpu, 1.45);
-          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.25));
+          setGlow(lane.gpuAssembly.memoryControllers[0], colors.returnBlock, 1.25);
           setGlow(lane.gpuAssembly.flowTraceMap.pcie, colors.gpu, 1.2);
           lane.gpuLink.material.opacity = 1;
         } else if (resolved.step === "controller-vram") {
-          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.1));
+          setGlow(lane.gpuAssembly.memoryControllers[0], colors.returnBlock, 1.1);
           bankIndexes.forEach((index) => {
             setGlow(lane.vram[index], colors.gpu, 1.55);
             setGlow(lane.gpuAssembly.flowTraceMap.vram[index], colors.gpu, 1.2);
@@ -1107,7 +1243,7 @@
           });
         } else if (resolved.step === "vram-core") {
           bankIndexes.forEach((index) => setGlow(lane.vram[index], colors.gpu, 1.05));
-          lane.gpuAssembly.memoryControllers.forEach((entry) => setGlow(entry, colors.returnBlock, 1.2));
+          setGlow(lane.gpuAssembly.memoryControllers[0], colors.returnBlock, 1.2);
           setGlow(lane.gpuAssembly.coreClusters[coreIndex], colors.gpu, 1.75);
           setGlow(lane.gpuAssembly.flowTraceMap.controllerCore, colors.gpu, 1.35);
           lane.gpuAssembly.coreClusters[coreIndex].scale.setScalar(1 + Math.sin(local * Math.PI) * 0.1);
@@ -1153,6 +1289,7 @@
     function updateBeat(frame) {
       const p = frame.progress;
       if (frame.gpuActive) updateGpuAssist(frame);
+      else if (["ssd", "dram", "storage"].includes(frame.componentProcessor) && updateStorageComponentFlow(frame)) return;
       else if (frame.beat === "inspect") updateInspect(frame);
       else if (frame.beat === "request") updateRequest(frame);
       else if (frame.beat === "nand-read") updateNandRead(frame);
@@ -1182,10 +1319,15 @@
       labelSprites.forEach((sprite) => { sprite.visible = frame.labels; });
       const closeCpu = String(frame.cameraTarget || "").startsWith("cpu-");
       const closeGpu = String(frame.cameraTarget || "").startsWith("gpu-");
+      const closeSsd = String(frame.cameraTarget || "").startsWith("ssd-");
+      const closeDram = String(frame.cameraTarget || "").startsWith("dram-");
       Object.values(lanes).forEach((lane) => {
         lane.cpuLabel.visible = frame.labels && !closeCpu;
         lane.gpuLabel.visible = frame.labels && !closeGpu;
         lane.gpuDetailLabel.visible = frame.labels && !closeGpu;
+        lane.ssdLabel.visible = frame.labels && !closeSsd;
+        lane.dramScratchLabel.visible = frame.labels && !closeDram;
+        lane.dramPqLabel.visible = frame.labels && !closeDram;
       });
       blockBay.visible = false;
       blockBay.scale.set(1, 1, 1);

@@ -159,6 +159,49 @@
     return "";
   }
 
+  function storageComponentRoute(hardware) {
+    const component = componentMeta(hardware);
+    const source = String(component.source || "").toLowerCase();
+    const destination = String(component.destination || "").toLowerCase();
+    const step = component.step.toLowerCase();
+    const from = (token) => source.includes(token);
+    const to = (token) => destination.includes(token);
+    const fromSsdController = from("ssd.controller") || from("ssd.nvme-controller");
+    const toSsdController = to("ssd.controller") || to("ssd.nvme-controller");
+    const fromDramInput = from("dram.input-port") || from("dram.dimm-input");
+    const toDramInput = to("dram.input-port") || to("dram.dimm-input");
+    const fromPayloadRegion = from("dram.payload-region") || from("dram.scratch-region") || from("dram.global-pq-region");
+    const toPayloadRegion = to("dram.payload-region") || to("dram.scratch-region") || to("dram.global-pq-region");
+
+    if (to("ssd.pcie-endpoint")) return "ssd-pcie-ingress";
+    if (from("ssd.pcie-endpoint") && toSsdController) return "ssd-controller-ingress";
+    if (fromSsdController && to("ssd.command-queue")) return "ssd-command-queue";
+    if (from("ssd.command-queue") && to("ssd.flash-channel")) return "ssd-flash-dispatch";
+    if (from("ssd.flash-channel") && to("ssd.nand-package")) return "ssd-package-select";
+    if (from("ssd.nand-package") && to("ssd.nand-die")) return "ssd-die-read";
+    if (from("ssd.nand-die") && to("ssd.return-buffer")) return "ssd-return-assemble";
+    if (from("ssd.return-buffer") && toDramInput) return "storage-handoff";
+    if (from("ssd.return-buffer")) return "ssd-return-out";
+    if (toDramInput) return "dram-ingress";
+    if (fromDramInput && to("dram.package")) return "dram-package-route";
+    if (from("dram.package") && to("dram.logical-bank")) return "dram-bank-select";
+    if (from("dram.logical-bank") && toPayloadRegion) return "dram-payload-place";
+    if (fromPayloadRegion && to("dram.output-port")) return "dram-output";
+    if (from("dram.output-port")) return "dram-to-compute";
+    if (step.includes("ssd-pcie")) return "ssd-pcie-ingress";
+    if (step.includes("command-queue")) return "ssd-command-queue";
+    if (step.includes("flash-channel")) return "ssd-flash-dispatch";
+    if (step.includes("nand-package")) return "ssd-package-select";
+    if (step.includes("nand-die")) return "ssd-die-read";
+    if (step.includes("return-buffer")) return "ssd-return-assemble";
+    if (step.includes("dram-input")) return "dram-ingress";
+    if (step.includes("dram-package")) return "dram-package-route";
+    if (step.includes("dram-bank")) return "dram-bank-select";
+    if (step.includes("payload-region")) return "dram-payload-place";
+    if (step.includes("dram-output")) return "dram-output";
+    return "";
+  }
+
   function hardwareCopy(hardware, phase) {
     const component = componentMeta(hardware);
     const gpuActive = hardware?.gpu?.active === true;
@@ -222,6 +265,113 @@
       if (!resolvedCopy && gpuCopy[hardware?.beat]) resolvedCopy = gpuCopy[hardware.beat];
     }
 
+    if (!resolvedCopy) {
+      const storageCopy = {
+        "ssd-pcie-ingress": [
+          "The SSD PCIe endpoint receives the logical read",
+          "The logical request reaching the SSD is canonical; this endpoint's internal placement and shape are illustrative.",
+        ],
+        "ssd-controller-ingress": [
+          "The SSD controller accepts symbolic LBA(p)",
+          "The controller handoff teaches request ownership. It does not assert a vendor-specific controller pipeline.",
+        ],
+        "ssd-command-queue": [
+          "The SSD command queue holds the node read",
+          "The requested logical span is canonical; queue depth, slot position, and scheduling order are illustrative.",
+        ],
+        "ssd-flash-dispatch": [
+          "A flash channel carries the internal read",
+          "This channel path is illustrative. The trace does not invent a physical channel number or NAND address.",
+        ],
+        "ssd-package-select": [
+          "The controller selects a NAND package",
+          "The package selection visualizes an internal SSD hop; only the node-chunk read at symbolic LBA(p) is canonical.",
+        ],
+        "ssd-die-read": [
+          "A NAND die exposes the requested node bytes",
+          "The node-chunk payload is canonical, while package and die geometry remain an illustrative cutaway.",
+        ],
+        "ssd-return-assemble": [
+          "The SSD return buffer assembles the read unit",
+          "Aligned logical unit(s) return to the host; this internal buffer layout is illustrative.",
+        ],
+        "ssd-return-out": [
+          "The SSD return buffer sends data toward host DRAM",
+          "The upward data return is canonical. The depicted internal egress path is illustrative.",
+        ],
+        "storage-handoff": [
+          "The SSD return buffer hands the read to DRAM",
+          "The aligned data return into reusable host scratch is canonical; both endpoint geometries are illustrative.",
+        ],
+        "dram-ingress": [
+          "DRAM accepts the returned read at its input port",
+          "The data landing in reusable host scratch is canonical; package routing shown inside DRAM is illustrative.",
+        ],
+        "dram-package-route": [
+          "The DRAM package routes the scratch write",
+          "This package-level path is a teaching cutaway, not a claim about a specific memory module or controller.",
+        ],
+        "dram-bank-select": [
+          "A logical DRAM bank receives the scratch payload",
+          "The reusable scratch lifetime is canonical; the selected bank and internal address are deliberately illustrative.",
+        ],
+        "dram-payload-place": [
+          "The payload region holds the returned fields",
+          "Full vector, neighbor IDs, and any inline PQ bytes preserve the trace's data-placement truth; their bank layout is illustrative.",
+        ],
+        "dram-output": [
+          "The DRAM output port exposes active operands",
+          "The CPU receives the correct logical operands; this internal output lane is illustrative.",
+        ],
+        "dram-to-compute": [
+          "DRAM sends active operands toward compute",
+          "The source tier and payload are canonical, while the visible package-to-processor wiring is illustrative.",
+        ],
+      };
+      const storageRoute = storageComponentRoute(hardware);
+      const dramAccessCopy = {
+        "dram-join": {
+          "dram-package-route": [
+            "DRAM routes a resident-PQ lookup",
+            "Neighbor IDs select matching entries already resident in DiskANN's global PQ array; the shown package route is illustrative.",
+          ],
+          "dram-bank-select": [
+            "A logical DRAM bank marks the resident-PQ access",
+            "The global-DRAM PQ source is canonical for DiskANN; this selected bank and its address are illustrative.",
+          ],
+          "dram-payload-place": [
+            "The resident global-PQ region exposes matching codes",
+            "These PQ codes were already in DRAM. They did not arrive with the current SSD node block.",
+          ],
+          "dram-output": [
+            "DRAM sends matching PQ codes toward the CPU LUT",
+            "The source tier and operands are canonical; the visible DIMM output lane is illustrative.",
+          ],
+        },
+        "inline-unpack": {
+          "dram-package-route": [
+            "DRAM routes an access to returned scratch",
+            "The neighbor IDs and inline PQ bytes are already in reusable scratch; this package route is illustrative.",
+          ],
+          "dram-bank-select": [
+            "A logical DRAM bank marks the scratch read",
+            "Scratch residency is canonical for this hop; the selected bank and its address are illustrative.",
+          ],
+          "dram-payload-place": [
+            "The scratch payload exposes inline neighbor PQ codes",
+            "These codes arrived in the current AiSAQ node chunk and remain in reusable scratch for this hop.",
+          ],
+          "dram-output": [
+            "DRAM sends inline PQ operands toward the CPU LUT",
+            "The inline-code source is canonical; the visible DIMM output lane is illustrative.",
+          ],
+        },
+      };
+      resolvedCopy = dramAccessCopy[hardware?.beat]?.[storageRoute]
+        || storageCopy[storageRoute]
+        || null;
+    }
+
     const copy = {
       inspect: ["See where every byte waits", "The hardware stays fixed while the active addresses and resident buffers are highlighted."],
       request: ["CPU asks NVMe for node p", "A small command travels toward the SSD. The query q does not travel with it."],
@@ -243,15 +393,27 @@
     const mappingNote = component.coreMapping && component.step.toLowerCase().includes("core")
       ? `${resolvedCopy[1]} ${component.coreMapping}`
       : resolvedCopy[1];
-    return [component.title || resolvedCopy[0], component.note || mappingNote];
+    return [resolvedCopy[0] || component.title, mappingNote || component.note];
   }
 
   function routeEndpoint(value, fallback) {
     const raw = String(value || "");
     const text = raw.toLowerCase();
     if (text.includes("request-queue")) return "Host request queue";
-    if (text.includes("ssd.controller")) return "SSD controller";
+    if (text.includes("ssd.pcie-endpoint")) return "SSD · PCIe endpoint";
+    if (text.includes("ssd.command-queue")) return "SSD · command queue";
+    if (text.includes("ssd.flash-channel")) return "SSD · flash channel";
+    if (text.includes("ssd.nand-package")) return "SSD · NAND package";
+    if (text.includes("ssd.nand-die")) return "SSD · NAND die";
+    if (text.includes("ssd.return-buffer")) return "SSD · return buffer";
+    if (text.includes("ssd.controller") || text.includes("ssd.nvme-controller")) return "SSD controller";
     if (text.includes("ssd.nand") || text.includes("lba(p)")) return "SSD · NAND";
+    if (text.includes("dram.input-port") || text.includes("dram.dimm-input")) return "DRAM · input port";
+    if (text.includes("dram.package")) return "DRAM · package";
+    if (text.includes("dram.logical-bank")) return "DRAM · logical bank";
+    if (text.includes("dram.payload-region") || text.includes("dram.scratch-region")) return "DRAM · scratch payload";
+    if (text.includes("dram.global-pq-region")) return "DRAM · global PQ region";
+    if (text.includes("dram.output-port")) return "DRAM · output port";
     if (text.includes("dram.scratch") || text.includes("scratch-pool")) return "DRAM scratch";
     if (text.includes("dram.pq-array")) return "DRAM · PQ array";
     if (text.includes("cpu.cache")) return "CPU · cache slices";
@@ -295,6 +457,41 @@
       };
       if (gpu[hardware.beat]) return gpu[hardware.beat];
     }
+    const storagePayload = {
+      "ssd-pcie-ingress": "Logical node read entering the SSD",
+      "ssd-controller-ingress": "Symbolic LBA(p) and logical span",
+      "ssd-command-queue": "Queued logical node read",
+      "ssd-flash-dispatch": "Internal read command · no physical address invented",
+      "ssd-package-select": "Illustrative NAND-package selection",
+      "ssd-die-read": "Requested node-chunk bytes",
+      "ssd-return-assemble": "Aligned logical read unit(s)",
+      "ssd-return-out": "Node data returning toward host DRAM",
+      "storage-handoff": "Aligned read unit(s) crossing into DRAM scratch",
+      "dram-ingress": "Returned node data entering reusable scratch",
+      "dram-package-route": "Scratch-write payload",
+      "dram-bank-select": "Reusable scratch allocation",
+      "dram-payload-place": "Full vector + neighbor IDs + optional inline PQ",
+      "dram-output": "Active scoring operands",
+      "dram-to-compute": "Logical operands leaving host DRAM",
+    };
+    const storageRoute = storageComponentRoute(hardware);
+    const dramAccessPayload = {
+      "dram-join": {
+        "dram-package-route": "Logical lookup keyed by neighbor IDs",
+        "dram-bank-select": "Logical access to resident global PQ state",
+        "dram-payload-place": "Resident global PQ codes for r neighbors",
+        "dram-output": "r matching PQ codes toward the CPU LUT",
+      },
+      "inline-unpack": {
+        "dram-package-route": "Logical access to returned scratch",
+        "dram-bank-select": "Scratch-resident neighbor/PQ fields",
+        "dram-payload-place": "Neighbor IDs + inline PQ codes already in scratch",
+        "dram-output": "r inline PQ operands toward the CPU LUT",
+      },
+    };
+    const storageComponentPayload = dramAccessPayload[hardware?.beat]?.[storageRoute]
+      || storagePayload[storageRoute];
+    if (storageComponentPayload) return storageComponentPayload;
     const payload = {
       inspect: "Resident addresses and reusable buffers",
       request: "Logical node read · q stays host-side",
