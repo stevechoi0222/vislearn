@@ -90,11 +90,61 @@
     function material(color, extra) {
       return remember(new THREE.MeshStandardMaterial(Object.assign({ color, roughness: 0.68, metalness: 0.18 }, extra || {})));
     }
+    function hardwareMaterial(color, extra) {
+      return remember(new THREE.MeshPhysicalMaterial(Object.assign({
+        color,
+        roughness: 0.34,
+        metalness: 0.42,
+        clearcoat: 0.38,
+        clearcoatRoughness: 0.3,
+      }, extra || {})));
+    }
     function basicMaterial(color, extra) {
       return remember(new THREE.MeshBasicMaterial(Object.assign({ color }, extra || {})));
     }
     function box(parent, size, position, mat, name) {
       const geometry = remember(new THREE.BoxGeometry(size[0], size[1], size[2]));
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.position.set(position[0], position[1], position[2]);
+      mesh.name = name || "";
+      parent.add(mesh);
+      return mesh;
+    }
+    function roundedRectShape(widthValue, heightValue, radiusValue) {
+      const halfWidth = widthValue / 2;
+      const halfHeight = heightValue / 2;
+      const radius = Math.min(radiusValue, halfWidth, halfHeight);
+      const shape = new THREE.Shape();
+      shape.moveTo(-halfWidth + radius, -halfHeight);
+      shape.lineTo(halfWidth - radius, -halfHeight);
+      shape.quadraticCurveTo(halfWidth, -halfHeight, halfWidth, -halfHeight + radius);
+      shape.lineTo(halfWidth, halfHeight - radius);
+      shape.quadraticCurveTo(halfWidth, halfHeight, halfWidth - radius, halfHeight);
+      shape.lineTo(-halfWidth + radius, halfHeight);
+      shape.quadraticCurveTo(-halfWidth, halfHeight, -halfWidth, halfHeight - radius);
+      shape.lineTo(-halfWidth, -halfHeight + radius);
+      shape.quadraticCurveTo(-halfWidth, -halfHeight, -halfWidth + radius, -halfHeight);
+      return shape;
+    }
+    function chamferBox(parent, size, position, mat, name, bevelValue) {
+      const smallestSide = Math.min(size[0], size[1], size[2]);
+      const bevel = Math.min(bevelValue == null ? 0.045 : bevelValue, smallestSide * 0.18);
+      const faceWidth = Math.max(0.01, size[0] - bevel * 2);
+      const faceHeight = Math.max(0.01, size[1] - bevel * 2);
+      const faceDepth = Math.max(0.01, size[2] - bevel * 2);
+      const geometry = remember(new THREE.ExtrudeGeometry(
+        roundedRectShape(faceWidth, faceHeight, Math.min(bevel * 0.72, faceWidth * 0.12, faceHeight * 0.12)),
+        {
+          curveSegments: 1,
+          steps: 1,
+          depth: faceDepth,
+          bevelEnabled: true,
+          bevelSegments: 1,
+          bevelSize: bevel,
+          bevelThickness: bevel,
+        }
+      ));
+      geometry.center();
       const mesh = new THREE.Mesh(geometry, mat);
       mesh.position.set(position[0], position[1], position[2]);
       mesh.name = name || "";
@@ -127,16 +177,32 @@
       labelCanvas.width = 512;
       labelCanvas.height = 112;
       const labelCtx = labelCanvas.getContext("2d");
+      const inset = 12;
+      const notch = 10;
+      labelCtx.clearRect(0, 0, 512, 112);
+      labelCtx.beginPath();
+      labelCtx.moveTo(inset + notch, 19);
+      labelCtx.lineTo(512 - inset, 19);
+      labelCtx.lineTo(512 - inset, 93 - notch);
+      labelCtx.lineTo(512 - inset - notch, 93);
+      labelCtx.lineTo(inset, 93);
+      labelCtx.lineTo(inset, 19 + notch);
+      labelCtx.closePath();
+      labelCtx.globalAlpha = 0.86;
       labelCtx.fillStyle = background;
-      labelCtx.fillRect(0, 0, 512, 112);
+      labelCtx.fill();
+      labelCtx.globalAlpha = 1;
       labelCtx.strokeStyle = "rgba(255,255,255,.3)";
-      labelCtx.lineWidth = 4;
-      labelCtx.strokeRect(2, 2, 508, 108);
+      labelCtx.lineWidth = 3;
+      labelCtx.stroke();
+      labelCtx.globalAlpha = 0.62;
       labelCtx.fillStyle = foreground;
-      labelCtx.font = "800 38px Avenir Next, Arial, sans-serif";
+      labelCtx.fillRect(inset + 9, 86, 512 - inset * 2 - 18, 3);
+      labelCtx.globalAlpha = 1;
+      labelCtx.font = "800 34px Avenir Next, Arial, sans-serif";
       labelCtx.textAlign = "center";
       labelCtx.textBaseline = "middle";
-      labelCtx.fillText(text, 256, 57, 480);
+      labelCtx.fillText(text, 256, 55, 468);
       const texture = remember(new THREE.CanvasTexture(labelCanvas));
       texture.colorSpace = THREE.SRGBColorSpace;
       return texture;
@@ -150,7 +216,7 @@
       }));
       const sprite = new THREE.Sprite(spriteMaterial);
       sprite.position.set(position[0], position[1], position[2]);
-      const resolvedScale = (scale || 2.5) * 0.68;
+      const resolvedScale = (scale || 2.5) * 0.64;
       sprite.scale.set(resolvedScale, resolvedScale * 0.219, 1);
       sprite.renderOrder = 20;
       parent.add(sprite);
@@ -159,8 +225,28 @@
     }
     function packet(parent, size, color, labelText) {
       const group = new THREE.Group();
-      const body = box(group, size, [0, 0, 0], material(color, { emissive: color, emissiveIntensity: 0.16 }), labelText);
+      const body = chamferBox(group, size, [0, 0, 0], hardwareMaterial(color, {
+        roughness: 0.27,
+        metalness: 0.26,
+        clearcoat: 0.58,
+        emissive: color,
+        emissiveIntensity: 0.16,
+      }), labelText, Math.min(0.055, Math.min(size[0], size[1], size[2]) * 0.16));
       edges(group, body, 0x0b1720, 0.9);
+      const faceColor = new THREE.Color(color).lerp(new THREE.Color(colors.white), 0.34).getHex();
+      chamferBox(
+        group,
+        [Math.max(0.08, size[0] * 0.68), Math.max(0.05, size[1] * 0.42), Math.max(0.018, size[2] * 0.035)],
+        [0, 0, size[2] * 0.515],
+        hardwareMaterial(faceColor, {
+          roughness: 0.22,
+          metalness: 0.18,
+          emissive: color,
+          emissiveIntensity: 0.12,
+        }),
+        "packet-inset",
+        0.018
+      );
       if (labelText) label(group, labelText, [0, 0, size[2] * 0.53 + 0.03], Math.max(0.85, size[0] * 1.45), "#0b1720", "#f7fbfb");
       parent.add(group);
       return group;
@@ -179,6 +265,9 @@
     const sideLight = new THREE.DirectionalLight(0x55d3d1, 1.1);
     sideLight.position.set(8, 2, 5);
     scene.add(sideLight);
+    const rimLight = new THREE.DirectionalLight(0x879dff, 1.15);
+    rimLight.position.set(-7, 4, -9);
+    scene.add(rimLight);
 
     const floor = new THREE.Mesh(
       remember(new THREE.PlaneGeometry(24, 18)),
@@ -214,7 +303,11 @@
       const cellGroup = new THREE.Group();
       cellGroup.position.x = cell.x;
       host.add(cellGroup);
-      const body = box(cellGroup, [cell.w, 0.72, 0.48], [0, -0.07, 0.25], material(cell.key === "lut" ? colors.cpuDeep : colors.dramDeep));
+      const body = chamferBox(cellGroup, [cell.w, 0.72, 0.48], [0, -0.07, 0.25], hardwareMaterial(cell.key === "lut" ? colors.cpuDeep : colors.dramDeep, {
+        roughness: 0.42,
+        metalness: 0.34,
+        clearcoat: 0.28,
+      }), "", 0.05);
       edges(cellGroup, body, 0xb4c6d0, 0.55);
       label(cellGroup, cell.text, [0, 0.04, 0.54], Math.min(cell.w * 1.35, 2.6), "#11202a", "#f3f7f7");
       hostObjects[cell.key] = cellGroup;
@@ -232,25 +325,95 @@
       edges(group, chassis, isDisk ? 0xc4d0d6 : 0x8ca1aa, 0.62);
       label(group, isDisk ? "DISKANN · global PQ address" : "AiSAQ · inline PQ payload", [0, 4.1, 1.25], 4.6, isDisk ? "#26333b" : "#101f27", "#f6f8f8");
 
-      const board = box(group, [5.9, 0.14, 2.8], [0, -0.55, -0.2], material(0x183a35));
+      const board = chamferBox(group, [5.9, 0.14, 2.8], [0, -0.55, -0.2], hardwareMaterial(0x173934, {
+        roughness: 0.58,
+        metalness: 0.2,
+        clearcoat: 0.16,
+      }), "board", 0.025);
       edges(group, board, 0x4da395, 0.8);
+      chamferBox(group, [5.45, 0.045, 2.42], [0, -0.462, -0.2], material(0x245049, {
+        roughness: 0.72,
+        metalness: 0.08,
+      }), "board-inlay", 0.008);
 
-      const cpu = box(group, [1.7, 0.55, 1.55], [0.65, 2.35, 0], material(colors.cpu, { emissive: colors.cpuDeep, emissiveIntensity: 0.18 }), "cpu");
+      const cpuSocket = chamferBox(group, [1.98, 0.16, 1.82], [0.65, 2.01, 0], hardwareMaterial(0x202a2f, {
+        roughness: 0.5,
+        metalness: 0.58,
+        clearcoat: 0.18,
+      }), "cpu-socket", 0.035);
+      edges(group, cpuSocket, 0x7c878c, 0.58);
+      const cpu = chamferBox(group, [1.7, 0.55, 1.55], [0.65, 2.35, 0], hardwareMaterial(0xc68d24, {
+        roughness: 0.28,
+        metalness: 0.48,
+        clearcoat: 0.5,
+        emissive: colors.cpuDeep,
+        emissiveIntensity: 0.18,
+      }), "cpu", 0.07);
       edges(group, cpu, 0xffd36d, 0.9);
+      const cpuCap = chamferBox(group, [1.28, 0.1, 1.1], [0.65, 2.675, 0], hardwareMaterial(colors.cpu, {
+        roughness: 0.2,
+        metalness: 0.72,
+        clearcoat: 0.52,
+      }), "cpu-cap", 0.035);
+      edges(group, cpuCap, 0xffe59a, 0.54);
       label(group, "CPU · LUT / exact", [0.65, 2.82, 0.9], 2.3, "#2e2412", "#ffd978");
 
-      const scratch = box(group, [2.25, 0.55, 1.35], [0.55, 0.75, 0], material(colors.dram, { transparent: true, opacity: 0.82 }), "scratch");
+      const scratchSlot = chamferBox(group, [2.52, 0.16, 1.58], [0.55, 0.43, 0], hardwareMaterial(0x17243e, {
+        roughness: 0.56,
+        metalness: 0.44,
+      }), "dram-slot", 0.03);
+      edges(group, scratchSlot, 0x6383c7, 0.5);
+      const scratch = chamferBox(group, [2.25, 0.55, 1.35], [0.55, 0.75, 0], hardwareMaterial(colors.dram, {
+        roughness: 0.32,
+        metalness: 0.25,
+        clearcoat: 0.46,
+        transparent: true,
+        opacity: 0.82,
+        emissive: colors.dramDeep,
+        emissiveIntensity: 0.12,
+      }), "scratch", 0.055);
       edges(group, scratch, 0xa8c0ff, 0.88);
+      const scratchChips = [];
+      for (let index = 0; index < 5; index += 1) {
+        scratchChips.push(chamferBox(group, [0.31, 0.075, 0.82], [-0.17 + index * 0.36, 1.065, 0], hardwareMaterial(0x173d88, {
+          roughness: 0.4,
+          metalness: 0.34,
+          clearcoat: 0.24,
+          transparent: true,
+          opacity: 0.86,
+          emissive: colors.dramDeep,
+          emissiveIntensity: 0.04,
+        }), "dram-chip", 0.018));
+      }
       label(group, "DRAM · reusable scratch", [0.55, 1.19, 0.77], 2.7, "#14265b", "#eaf0ff");
 
       const pqBank = new THREE.Group();
       const pqCells = [];
       pqBank.position.set(-2.05, 0.75, 0);
       group.add(pqBank);
+      const pqBackplane = chamferBox(pqBank, [1.95, 1.72, 0.14], [0, 0, -0.5], hardwareMaterial(0x1b2943, {
+        roughness: 0.56,
+        metalness: 0.35,
+      }), "pq-backplane", 0.025);
+      edges(pqBank, pqBackplane, 0x60769d, 0.42);
       for (let index = 0; index < (isDisk ? 8 : 2); index += 1) {
         const column = index % 4;
         const row = Math.floor(index / 4);
-        pqCells.push(box(pqBank, [0.35, 0.7, 0.85], [(column - 1.5) * 0.43, row * 0.78 - 0.38, 0], material(index < (isDisk ? 8 : 1) ? colors.pq : colors.steel)));
+        const activeCell = index < (isDisk ? 8 : 1);
+        pqCells.push(chamferBox(
+          pqBank,
+          [0.35, 0.7, 0.85],
+          [(column - 1.5) * 0.43, row * 0.78 - 0.38, 0],
+          hardwareMaterial(activeCell ? colors.pq : colors.steel, {
+            roughness: 0.3,
+            metalness: 0.42,
+            clearcoat: 0.34,
+            emissive: activeCell ? colors.pq : colors.steel,
+            emissiveIntensity: 0.04,
+          }),
+          "pq-cell",
+          0.035
+        ));
       }
       label(group, isDisk ? "DRAM · GLOBAL PQ[N]" : "DRAM · n_ep seed only", [-2.05, 1.52, 0.72], 2.45, "#14265b", "#f7e88e");
 
@@ -258,18 +421,52 @@
       pcie.name = "pcie-nvme";
       label(group, "PCIe / NVMe", [1.2, -0.2, 0.7], 1.9, "#3b2c13", "#ffd56f");
 
-      const controller = box(group, [2.4, 0.48, 1.35], [0.55, -1.45, 0], material(colors.ssdDeep), "controller");
+      const controllerBoard = chamferBox(group, [2.82, 0.14, 1.72], [0.55, -1.75, 0], hardwareMaterial(0x173934, {
+        roughness: 0.58,
+        metalness: 0.24,
+      }), "controller-board", 0.025);
+      edges(group, controllerBoard, 0x3a7f75, 0.45);
+      const controller = chamferBox(group, [2.4, 0.48, 1.35], [0.55, -1.45, 0], hardwareMaterial(colors.ssdDeep, {
+        roughness: 0.31,
+        metalness: 0.38,
+        clearcoat: 0.42,
+        emissive: colors.ssdDeep,
+        emissiveIntensity: 0.08,
+      }), "controller", 0.055);
       edges(group, controller, 0x5de1d2, 0.82);
+      const controllerCap = chamferBox(group, [1.35, 0.085, 0.82], [0.55, -1.165, 0], hardwareMaterial(colors.ssd, {
+        roughness: 0.25,
+        metalness: 0.54,
+        clearcoat: 0.45,
+      }), "controller-cap", 0.025);
+      edges(group, controllerCap, 0x9ff8ec, 0.46);
       label(group, "SSD controller", [0.55, -1.03, 0.78], 2.15, "#10332f", "#9ff8ec");
 
       const nand = new THREE.Group();
       const nandChips = [];
       nand.position.set(0.3, -2.85, 0);
       group.add(nand);
+      const nandBoard = chamferBox(nand, [5.35, 0.14, 1.43], [0, -0.32, 0], hardwareMaterial(0x153a34, {
+        roughness: 0.6,
+        metalness: 0.2,
+      }), "nand-board", 0.025);
+      edges(nand, nandBoard, 0x3f8c80, 0.46);
       for (let index = 0; index < 4; index += 1) {
-        const chip = box(nand, [1.15, 0.52, 1.05], [(index - 1.5) * 1.3, 0, 0], material(colors.ssd));
+        const chipX = (index - 1.5) * 1.3;
+        const chip = chamferBox(nand, [1.15, 0.52, 1.05], [chipX, 0, 0], hardwareMaterial(0x168a80, {
+          roughness: 0.3,
+          metalness: 0.34,
+          clearcoat: 0.4,
+          emissive: colors.ssdDeep,
+          emissiveIntensity: 0.06,
+        }), "nand-chip", 0.055);
         nandChips.push(chip);
         edges(nand, chip, 0x8ff4e7, 0.75);
+        chamferBox(nand, [0.78, 0.075, 0.68], [chipX, 0.298, 0], hardwareMaterial(colors.ssd, {
+          roughness: 0.25,
+          metalness: 0.48,
+          clearcoat: 0.46,
+        }), "nand-cap", 0.022);
       }
       label(group, "SSD · NAND packages", [0.3, -2.35, 0.72], 2.75, "#10332f", "#a8fff4");
 
@@ -284,14 +481,40 @@
       const gpuDieX = -0.35 * componentMirror;
       gpuGroup.position.set(gpuGroupX, -0.5, -1.18);
       group.add(gpuGroup);
-      const gpuBoard = box(gpuGroup, [2.9, 1.65, 0.14], [0, 0, 0], material(0x262b3b));
+      const gpuBoard = chamferBox(gpuGroup, [2.9, 1.65, 0.14], [0, 0, 0], hardwareMaterial(0x262b3b, {
+        roughness: 0.55,
+        metalness: 0.3,
+        clearcoat: 0.16,
+      }), "gpu-board", 0.025);
       edges(gpuGroup, gpuBoard, 0x786ca9, 0.65);
-      const gpuDie = box(gpuGroup, [0.95, 0.95, 0.28], [gpuDieX, 0, 0.16], material(colors.gpuDim), "gpu");
+      const gpuDie = chamferBox(gpuGroup, [0.95, 0.95, 0.28], [gpuDieX, 0, 0.16], hardwareMaterial(colors.gpuDim, {
+        roughness: 0.28,
+        metalness: 0.46,
+        clearcoat: 0.4,
+        emissive: colors.gpu,
+        emissiveIntensity: 0.02,
+      }), "gpu", 0.045);
       edges(gpuGroup, gpuDie, 0xaa92ef, 0.55);
+      const gpuDieCap = chamferBox(gpuGroup, [0.62, 0.62, 0.075], [gpuDieX, 0, 0.345], hardwareMaterial(0x51496e, {
+        roughness: 0.2,
+        metalness: 0.62,
+        clearcoat: 0.45,
+      }), "gpu-cap", 0.025);
       const vram = [];
+      const vramCaps = [];
       const vramPositions = [[-1.05, 0.56], [-1.05, -0.56], [0.45, 0.62], [0.45, -0.62]];
       vramPositions.forEach((position) => {
-        vram.push(box(gpuGroup, [0.48, 0.38, 0.24], [position[0] * componentMirror, position[1], 0.16], material(colors.gpuDim), "vram"));
+        const chipX = position[0] * componentMirror;
+        vram.push(chamferBox(gpuGroup, [0.48, 0.38, 0.24], [chipX, position[1], 0.16], hardwareMaterial(colors.gpuDim, {
+          roughness: 0.36,
+          metalness: 0.38,
+          emissive: colors.gpu,
+          emissiveIntensity: 0,
+        }), "vram", 0.03));
+        vramCaps.push(chamferBox(gpuGroup, [0.3, 0.22, 0.055], [chipX, position[1], 0.315], hardwareMaterial(0x494361, {
+          roughness: 0.24,
+          metalness: 0.52,
+        }), "vram-cap", 0.016));
       });
       label(gpuGroup, "GPU · optional illustrative", [0, 1.16, 0.22], 2.75, "#241d3e", "#c8b7ff");
       label(gpuGroup, "VRAM", [-0.86 * componentMirror, -0.2, 0.35], 1.05, "#241d3e", "#c8b7ff");
@@ -304,7 +527,7 @@
       };
       const gpuLink = lineBetween(group, [0.65, 2.05, -0.72], gpuPoints.link, colors.gpuDim, 0.045, 0.35);
 
-      return { method, group, chassis, board, cpu, scratch, pqBank, pqCells, pcie, controller, nand, nandChips, ssdCopy, gpuGroup, gpuBoard, gpuDie, vram, gpuLink, gpuPoints };
+      return { method, group, chassis, board, cpu, scratch, scratchChips, pqBank, pqCells, pcie, controller, nand, nandChips, ssdCopy, gpuGroup, gpuBoard, gpuDie, gpuDieCap, vram, vramCaps, gpuLink, gpuPoints };
     }
 
     const lanes = {
@@ -492,6 +715,7 @@
         setGlow(lane.cpu, colors.cpuDeep, 0.18);
         setGlow(lane.scratch, colors.dramDeep, 0.12);
         lane.scratch.material.opacity = 0.82;
+        lane.scratchChips.forEach((chip) => { chip.material.opacity = 0.86; });
         setGlow(lane.controller, colors.ssdDeep, 0.08);
         lane.nandChips.forEach((chip) => setGlow(chip, colors.ssdDeep, 0.06));
         lane.pqCells.forEach((cell) => setGlow(cell, colors.pq, 0.04));
@@ -503,7 +727,9 @@
       Object.values(lanes).forEach((lane) => {
         lane.gpuBoard.material.color.setHex(active ? 0x393052 : 0x262b3b);
         lane.gpuDie.material.color.setHex(active ? colors.gpu : colors.gpuDim);
+        lane.gpuDieCap.material.color.setHex(active ? 0xb19af0 : 0x51496e);
         lane.vram.forEach((chip) => chip.material.color.setHex(active ? 0x7054b3 : colors.gpuDim));
+        lane.vramCaps.forEach((chip) => chip.material.color.setHex(active ? 0x9c83dc : 0x494361));
         setGlow(lane.gpuDie, colors.gpu, active ? 0.35 : 0.02);
         lane.vram.forEach((chip) => setGlow(chip, colors.gpu, active ? 0.16 : 0));
         lane.gpuLink.material.color.setHex(active ? colors.gpu : colors.gpuDim);
@@ -678,8 +904,11 @@
     }
     function updateScratchRelease(frame) {
       methodsFor(frame).forEach((method) => {
-        const scratch = lanes[method].scratch;
-        scratch.material.opacity = lerp(0.82, 0.055, smooth(clamp(frame.progress / 0.72, 0, 1)));
+        const lane = lanes[method];
+        const scratch = lane.scratch;
+        const release = smooth(clamp(frame.progress / 0.72, 0, 1));
+        scratch.material.opacity = lerp(0.82, 0.055, release);
+        lane.scratchChips.forEach((chip) => { chip.material.opacity = lerp(0.86, 0.08, release); });
         setGlow(scratch, colors.returnBlock, lerp(0.55, 0, frame.progress));
       });
     }
